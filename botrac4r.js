@@ -2,9 +2,22 @@
 
 /// === REQUIRES, CONSTANTS AND GLOBALS ===
 
+let cf = {}, bf = {}, bc = {};
+let modules = [
+    {
+        filename: "./common.js",
+        dest: "common"
+    },{
+        filename: "./commonbot.js",
+        dest: "bot framework"
+    },{
+        filename: "./botcommands.js",
+        dest: "bot commands"
+    }
+];
+
 let token = require("./token.js"); // Bot token
-let cf = require("./common.js"); // Common functions
-let log = cf.log; // Shortcut to log
+//let cf = require("./common.js"); // Common functions
 let defaultPrefix = ".";
 let defaultSeperator = " ";
 let defaultAltSplit = ";";
@@ -18,6 +31,8 @@ let bot = new Discord.Client({ // Log in bot
     token: token,
     autorun: true
 });
+loadModules();
+let log = cf.log; // Shortcut to log
 try {
     configurables = JSON.parse(fs.readFileSync("./configurables.json"));
 } catch (e) {
@@ -25,8 +40,9 @@ try {
     configurables = JSON.parse(fs.readFileSync("./configurables.json.bak"));
     fs.writeFileSync("./configurables.json", JSON.stringify(configurables));
 }
-let bf = require("./commonbot.js")(bot, cf); // Common bot functions
-let bc = require("./botcommands.js")(bot, cf, bf); // Complete bot commands
+
+//let bf = require("./commonbot.js")(bot, cf); // Common bot functions
+//let bc = require("./botcommands.js")(bot, cf, bf); // Complete bot commands
 
 let stdin = process.stdin; // Use the terminal to run JS code
 stdin.on("data", function(input) {
@@ -39,6 +55,32 @@ stdin.on("data", function(input) {
         log("Error while running code:\n"+e, "responseError");
     }
 });
+
+function loadModules(module) {
+    let mods = modules;
+    if (module) mods = [module];
+    mods.forEach(m => {
+        console.log("Loading module "+m.filename);
+        delete require.cache[require.resolve(m.filename)];
+        switch (m.dest) {
+        case "common":
+            Object.assign(cf, require(m.filename));
+            break;
+        case "bot framework":
+            Object.assign(bf, require(m.filename)(bot, cf));
+            break;
+        case "bot commands":
+            Object.assign(bc, require(m.filename)(bot, cf, bf));
+            break;
+        }
+        if (!m.watched) {
+            m.watched = true;
+            fs.watchFile(m.filename, function() {
+                loadModules(m);
+            });
+        }
+    });
+}
 
 bot.on("ready", function() { // Once the bot connects
     log(`Logged in as ${bot.username} (${bot.id})`, "info");
