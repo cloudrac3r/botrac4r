@@ -33,13 +33,6 @@ let bot = new Discord.Client({ // Log in bot
 });
 loadModules(); // Actually load the modules
 let log = cf.log; // Shortcut to log
-try { //TODO: Replace this with a database :angery:
-    configurables = JSON.parse(fs.readFileSync("./configurables.json"));
-} catch (e) {
-    log("Restoring backup configurables copy");
-    configurables = JSON.parse(fs.readFileSync("./configurables.json.bak"));
-    fs.writeFileSync("./configurables.json", JSON.stringify(configurables));
-}
 
 //let bf = require("./commonbot.js")(bot, cf); // Common bot functions
 //let bc = require("./botcommands.js")(bot, cf, bf); // Complete bot commands
