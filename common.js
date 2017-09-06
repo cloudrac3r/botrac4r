@@ -27,6 +27,7 @@ module.exports = {
     stringify: function(input, longJSON) {
         if (!input) return "undefined";
         if (typeof(input) == "number") return input.toString();
+        if (typeof(input) == "boolean") return input.toString();
         if (typeof(input) == "object") {
             if (longJSON) return JSON.stringify(input, null, 4);
             else return JSON.stringify(input);

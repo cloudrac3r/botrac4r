@@ -75,7 +75,8 @@ function loadModules(module) {
         }
         if (!m.watched) {
             m.watched = true;
-            fs.watchFile(m.filename, function() {
+            fs.watchFile(m.filename, {interval: 2007}, function() {
+                bf.sendMessage("176580265294954507", "Reloading "+m.filename);
                 loadModules(m);
             });
         }

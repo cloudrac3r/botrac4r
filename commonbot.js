@@ -25,7 +25,15 @@ module.exports = function(bot, cf) {
                         cf.log(cf.stringify(err, true), "error");
                     }
                 } else {
-                    cf.log(`Sent a message to #${bot.channels[channelID].name} (${channelID}): ${message}`, "spam");
+                    let channelName = "unnamed channel";
+                    if (bot.users[channelID]) {
+                        channelName = "@"+bot.users[channelID].username;
+                    } else if (bot.directMessages[channelID]) {
+                        channelName = "@"+bot.directMessages[channelID].recipient.username;
+                    } else {
+                        channelName = "#"+bot.channels[channelID].name;
+                    }
+                    cf.log(`Sent a message to ${channelName} (${channelID}): ${message}`, "spam");
                     callback(false);
                 }
             });
