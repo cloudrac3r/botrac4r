@@ -1,4 +1,5 @@
 module.exports = {
+    // Log a message to console with a prefix
     log: function(text, severity) {
         let prefixes = {"error": "[#]", "warning": "[!]", "info": "[.]", "spam": "[ ]", "unknown": "[?]", "responseInfo": "( )", "responseError": "(!)"}; // Names and types of logging
         text = module.exports.stringify(text);
@@ -6,11 +7,13 @@ module.exports = {
         text = text.replace(/\n/g, "\n"+prefix.replace(/([[(]).([\])])/, "$1^$2")); // Deal with newlines (prefix each line)
         console.log(prefix+text);
     },
+    // Given a time, return "HHMMSS"
     getSixTime: function(when, seperator) {
         let d = new Date(when || Date.now());
         if (!seperator) seperator = "";
         return d.getHours().toString().padStart(2, "0")+seperator+d.getMinutes().toString().padStart(2, "0")+seperator+d.getSeconds().toString().padStart(2, "0");
     },
+    // Get specific arguments from a string.
     sarg: function(input, count, char) {
         if (!char) char = " "; // Split at spaces unless told otherwise
         input = module.exports.stringify(input);
@@ -24,6 +27,7 @@ module.exports = {
             }
         }
     },
+    // Convert any object (well, not yet) to a string for logging, sending, etc.
     stringify: function(input, longJSON) {
         if (!input) return "undefined";
         if (typeof(input) == "number") return input.toString();
@@ -35,9 +39,11 @@ module.exports = {
         if (typeof(input) == "string") return input;
         return "unknown";
     },
+    // Get a random number between two inputs. Includes maximum value.
     rint: function(min, max) {
         return Math.floor(Math.random()*(max-min+1)+min);
     },
+    // The better command argument function.
     carg: function(input, split, altSplit) {
         if (!split) split = " ";
         if (!altSplit) altSplit = ";";
@@ -52,9 +58,11 @@ module.exports = {
         output.words.filter(i => i.match(/\w=[^\s]/)).forEach(i => output.switches[module.exports.trim(i).split("=")[0]] = module.exports.trim(i).split("=")[1]);
         return output;
     },
+    // Return a random element from a supplied array.
     rarray: function(array) {
         return array[module.exports.rint(0, array.length-1)];
     },
+    // Convert an array of strings to a humanised list.
     listify: function(array, empty) {
         if (!empty) empty = "nothing";
         switch (array.length) {
@@ -68,6 +76,7 @@ module.exports = {
             return array[0]+", "+module.exports.listify(array.slice(1)); // For arrays with more than 2 items, recurse.
         }
     },
+    // Trim leading and trailing spaces (or another character) from a string.
     trim: function(string, remove) {
         if (!remove) remove = " ";
         return string.replace(new RegExp(`^${remove}+|${remove}+$`, "g"), "");
