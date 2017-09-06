@@ -2,7 +2,7 @@
 
 /// === REQUIRES, CONSTANTS AND GLOBALS ===
 
-let cf = {}, bf = {}, bc = {}; // Common Functions, Bot Framework and Bot Commands
+let cf = {}; let bf = {}; let bc = {}; // Common Functions, Bot Framework and Bot Commands
 let modules = [ // Load these modules on startup and on change
     {
         filename: "./common.js",
@@ -21,11 +21,14 @@ let token = require("./token.js"); // Bot token
 let defaultPrefix = "."; // Bot prefixes and related, can be changed by user preferences
 let defaultSeperator = " ";
 let defaultAltSplit = ";";
+let defaultMentionPref = 1;
 let configurables;
 
 let Discord = require("discord.io"); // Important libraries
 let fs = require("fs");
 let request = require("request");
+let sqlite = require("sqlite3");
+let db = new sqlite.Database("./botrac4r.db");
 
 let bot = new Discord.Client({ // Log in bot
     token: token,
@@ -70,7 +73,7 @@ function loadModules(module) {
         if (!m.watched) { // If file isn't already being watched,
             m.watched = true;
             fs.watchFile(m.filename, {interval: 2007}, function() { // watch it.
-                bf.sendMessage("176580265294954507", "Reloading "+m.filename);
+                bf.sendMessage("244613376360054794", "Reloading "+m.filename);
                 loadModules(m);
             });
         }
@@ -82,16 +85,23 @@ bot.on("ready", function() { // Once the bot connects
 });
 
 bot.on("message", function(user, userID, channelID, message, event) {
+    if (bot.users[userID].bot && userID != "238459957811478529") return; // Ignore all bots except for botrac3r //TODO: change
     let data = event.d;
-    //let id = event.d.id;
-    //let mentions = event.d.mentions;
-    //log(event, "info");
-    if (message.startsWith(defaultPrefix)) { // If the message starts with the bot prefix
-        let mp = message.slice(defaultPrefix.length).split(defaultSeperator);
-        for (let c in bc) { // Find a bot command whose alias matches
-            if (bc[c].aliases.includes(mp[0])) {
-                bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(defaultSeperator), defaultSeperator, defaultAltSplit), data); // Call it
+    db.get(`SELECT prefix, seperator FROM Users WHERE userID = '${userID}'`, function(err, dbr) {
+        if (!dbr) {
+            bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There's be a command at some point to change them.");
+            dbr = {prefix: defaultPrefix, seperator: defaultSeperator, altSeperator: defaultAltSplit};
+            db.run(`INSERT INTO Users VALUES ('${userID}', '${defaultPrefix}', '${defaultSeperator}', '${defaultAltSplit}', '${defaultMentionPref}')`);
+        }
+        let { prefix, seperator, altSeperator } = dbr;
+        //log(event, "info");
+        if (message.startsWith(prefix)) { // If the message starts with the bot prefix
+            let mp = message.slice(prefix.length).split(seperator);
+            for (let c in bc) { // Find a bot command whose alias matches
+                if (bc[c].aliases.includes(mp[0])) {
+                    bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), seperator, defaultAltSplit), data); // Call it
+                }
             }
         }
-    }
+    });
 });
