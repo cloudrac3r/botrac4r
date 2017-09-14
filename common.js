@@ -29,9 +29,9 @@ module.exports = {
     },
     // Convert any object (well, not yet) to a string for logging, sending, etc.
     stringify: function(input, longJSON) {
-        if (!input) return "undefined";
         if (typeof(input) == "number") return input.toString();
         if (typeof(input) == "boolean") return input.toString();
+        if (!input) return "undefined";
         if (typeof(input) == "object") {
             if (longJSON) return JSON.stringify(input, null, 4);
             else return JSON.stringify(input);
@@ -80,5 +80,16 @@ module.exports = {
     trim: function(string, remove) {
         if (!remove) remove = " ";
         return string.replace(new RegExp(`^${remove}+|${remove}+$`, "g"), "");
+    },
+    // Check if one object has all the same immediate properties as another.
+    slimMatch: function(objects) {
+        let result = Object.keys(objects[0]).every(p => objects[0][p]==objects[1][p]);
+        if (!result) {
+            return false;
+        } else if (objects.length <= 2) {
+            return true;
+        } else {
+            return module.exports.slimMatch(objects.slice(1));;
+        }
     }
 }

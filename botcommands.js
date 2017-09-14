@@ -1,4 +1,5 @@
-module.exports = function(bot, cf, bf) {
+module.exports = function(input) {
+    let {bot, cf, bf, db} = input;
     let availableFunctions = {
         roll: {
             aliases: ["roll", "dice", "random", "rng"],
@@ -11,6 +12,16 @@ module.exports = function(bot, cf, bf) {
                 let result = cf.rint(min, max); // Pick the number
                 let message = (command.switches.message || command.nonNumbers.join(" ") || `a number`); // Get the input message
                 bf.sendMessage(d.channel_id, `Choosing ${message} from ${min} to ${max}: **${result}**`); // Send it all back
+            }
+        },
+        menu: {
+            aliases: ["menu"],
+            code: function(userID, channelID, command, d) {
+                bf.reactionMenu(channelID, "Test reaction menu", [
+                    {emoji: "🙂", remove: "user", actionType: "reply", actionData: "You clicked the slight smile."},
+                    {emoji: "😄", remove: "user", actionType: "reply", actionData: "You clicked the big smile."},
+                    {emoji: "<:hippo:268962438181945345>", remove: "menu", actionType: "reply", actionData: "You clicked the hippo."}
+                ]);
             }
         }
     };

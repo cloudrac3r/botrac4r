@@ -58,22 +58,30 @@ function loadModules(module) {
     if (module) mods = [module];
     mods.forEach(m => {
         console.log("Loading module "+m.filename);
-        delete require.cache[require.resolve(m.filename)]; // Otherwise it loads from the cache and ignores file changes
-        switch (m.dest) { // Do different things depending on its purpose
-        case "common":
-            Object.assign(cf, require(m.filename)); // Load it into common functions
-            break;
-        case "bot framework":
-            Object.assign(bf, require(m.filename)(bot, cf)); // Load it into bot framework
-            break;
-        case "bot commands":
-            Object.assign(bc, require(m.filename)(bot, cf, bf)); // Load it as bot commands
-            break;
+        try {
+            delete require.cache[require.resolve(m.filename)]; // Otherwise it loads from the cache and ignores file changes
+            switch (m.dest) { // Do different things depending on its purpose
+            case "common":
+                Object.assign(cf, require(m.filename)); // Load it into common functions
+                break;
+            case "bot framework":
+                Object.assign(bf, require(m.filename)({bot: bot, cf: cf, db: db})); // Load it into bot framework
+                break;
+            case "bot commands":
+                Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db})); // Load it as bot commands
+                break;
+            }
+        } catch (e) {
+            if (bf.sendMessage) {
+                bf.sendMessage("244613376360054794", "Failed to reload module **"+m.filename+"**: `"+e+"`");
+            } else {
+                console.log("Failed to reload module "+m.filename+"\n"+e);
+            }
         }
         if (!m.watched) { // If file isn't already being watched,
             m.watched = true;
             fs.watchFile(m.filename, {interval: 2007}, function() { // watch it.
-                bf.sendMessage("244613376360054794", "Reloading "+m.filename);
+                bf.sendMessage("244613376360054794", "Reloading **"+m.filename+"**");
                 loadModules(m);
             });
         }
@@ -87,11 +95,11 @@ bot.on("ready", function() { // Once the bot connects
 bot.on("message", function(user, userID, channelID, message, event) {
     if (bot.users[userID].bot && userID != "238459957811478529") return; // Ignore all bots except for botrac3r //TODO: change
     let data = event.d;
-    db.get(`SELECT prefix, seperator FROM Users WHERE userID = '${userID}'`, function(err, dbr) {
+    db.get("SELECT prefix, seperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
         if (!dbr) {
-            bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There's be a command at some point to change them.");
+            bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, seperator: defaultSeperator, altSeperator: defaultAltSplit};
-            db.run(`INSERT INTO Users VALUES ('${userID}', '${defaultPrefix}', '${defaultSeperator}', '${defaultAltSplit}', '${defaultMentionPref}')`);
+            db.run("INSERT INTO Users VALUES (?, ?, ?, ?, ?)", [userID, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
         }
         let { prefix, seperator, altSeperator } = dbr;
         //log(event, "info");
