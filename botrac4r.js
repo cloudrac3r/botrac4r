@@ -72,7 +72,7 @@ function loadModules(module) {
                 break;
             }
         } catch (e) {
-            if (bf.sendMessage) {
+            if (bot.connected) {
                 bf.sendMessage("244613376360054794", "Failed to reload module **"+m.filename+"**: `"+e+"`");
             } else {
                 console.log("Failed to reload module "+m.filename+"\n"+e);

@@ -210,7 +210,7 @@ module.exports = function(input) {
                     bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
                     break;
                 case "js": // Run JS code
-                    action.actionData(event);
+                    action.actionData(event, reactionMenus);
                     break;
                 }
                 switch (action.remove) { // Sometimes remove certain emojis after being clicked
@@ -231,6 +231,22 @@ module.exports = function(input) {
                     break;
                 case "message": // Delete the message containing the menu reactions
                     bot.deleteMessage({channelID: event.d.channel_id, messageID: event.d.message_id});
+                    break;
+                }
+                switch (action.ignore) { // Sometimes ignore repeat actions
+                case "that": // Disable actions for that emoji
+                    menu.actions = menu.actions.map(a => {
+                        if (cf.slimMatch([availableFunctions.emojiToObject(a.emoji), availableFunctions.emojiToObject(action.emoji)])) {
+                            Object.assign(a, {actionType: "none"});
+                        }
+                        return a;
+                    });
+                    break;
+                case "all": // Disable actions for all emojis
+                    menu.actions.map(a => Object.assign(a, {actionType: "none"}));
+                    break;
+                case "total": // Stop treating the message as a menu
+                    delete reactionMenus[event.d.message_id];
                     break;
                 }
             });

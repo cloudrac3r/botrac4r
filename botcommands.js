@@ -18,10 +18,12 @@ module.exports = function(input) {
             aliases: ["menu"],
             code: function(userID, channelID, command, d) {
                 bf.reactionMenu(channelID, "Test reaction menu", [
-                    {emoji: "🙂", remove: "user", actionType: "reply", actionData: "You clicked the slight smile."},
-                    {emoji: "😄", remove: "user", actionType: "reply", actionData: "You clicked the big smile."},
-                    {emoji: "<:hippo:268962438181945345>", remove: "menu", actionType: "reply", actionData: "You clicked the hippo."}
+                    {emoji: "🙂", remove: "user", ignore: "that", actionType: "reply", actionData: "You clicked the slight smile."},
+                    {emoji: "😄", remove: "user", ignore: "total", actionType: "reply", actionData: "You clicked the big smile."},
+                    {emoji: "<:hippo:268962438181945345>", remove: "user", ignore: "that", actionType: "reply", actionData: "You clicked the hippo."},
+                    {emoji: "📄", remove: "user", ignore: "that", actionType: "js", actionData: function(ev, r) {bf.sendMessage(r[Object.keys(r)[0]].channelID, "```"+cf.stringify(r, true)+"```")}}
                 ]);
+                cf.log(bot);
             }
         }
     };
