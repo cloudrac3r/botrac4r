@@ -206,18 +206,31 @@ module.exports = function(input) {
                 case "reply": // Reply, mention the user in the same channel and give a message
                     availableFunctions.sendMessage(event.d.channel_id, `<@${event.d.user_id}> ${action.actionData}`);
                     break;
+                case "edit": // Edit the message containing the menu reactions
+                    bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
+                    break;
                 case "js": // Run JS code
-                    action.actionData();
+                    action.actionData(event);
                     break;
                 }
                 switch (action.remove) { // Sometimes remove certain emojis after being clicked
                 case "user": // Remove the user's reaction only
                     availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id);
                     break;
+                case "bot": // Remove the bot's reaction that the user matched
+                    availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, bot.id);
+                    break;
+                case "that": // Remove everyone's reactions that the user matched
+                    availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, [action.emoji]);
+                    break;
                 case "menu": // Remove all reactions belonging to that menu
-                    availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji), undefined, function() {
-                        availableFunctions.sendMessage(event.d.channel_id, "Done removing reactions")
-                    });
+                    availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji));
+                    break;
+                case "all": // Remove all reactions on that message
+                    bot.removeAllReactions({channelID: event.d.channel_id, messageID: event.d.message_id});
+                    break;
+                case "message": // Delete the message containing the menu reactions
+                    bot.deleteMessage({channelID: event.d.channel_id, messageID: event.d.message_id});
                     break;
                 }
             });
