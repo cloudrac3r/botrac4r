@@ -88,7 +88,12 @@ function loadModules(module) {
     });
 }
 
-bot.on("ready", function() { // Once the bot connects
+bot.once("ready", function() {
+    log("Loading users", "info");
+    bot.getAllUsers();
+});
+
+bot.once("allUsers", function() { // Once the bot connects
     log(`Logged in as ${bot.username} (${bot.id})`, "info");
 });
 
@@ -112,4 +117,9 @@ bot.on("message", function(user, userID, channelID, message, event) {
             }
         }
     });
+});
+
+bot.on("disconnect", function() {
+    log("Disconnected from Discord, will reconnect automatically.", "info");
+    bot.connect();
 });
