@@ -13,6 +13,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: "./botcommands.js",
         dest: "bot commands"
+    },{
+        filename: "./onuw.js",
+        dest: "bot commands"
     }
 ];
 
@@ -73,15 +76,16 @@ function loadModules(module) {
             }
         } catch (e) {
             if (bot.connected) {
-                bf.sendMessage("244613376360054794", "Failed to reload module **"+m.filename+"**: `"+e+"`");
-            } else {
-                console.log("Failed to reload module "+m.filename+"\n"+e);
+                bf.sendMessage("244613376360054794", "Failed to load module **"+m.filename+"**: `"+e+"`");
             }
+            console.log("Failed to reload module "+m.filename+"\n"+e);
+        }
+        if (bot.connected) {
+            bf.sendMessage("244613376360054794", "Loaded **"+m.filename+"**");
         }
         if (!m.watched) { // If file isn't already being watched,
             m.watched = true;
             fs.watchFile(m.filename, {interval: 2007}, function() { // watch it.
-                bf.sendMessage("244613376360054794", "Reloading **"+m.filename+"**");
                 loadModules(m);
             });
         }
