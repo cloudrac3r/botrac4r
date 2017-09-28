@@ -2,6 +2,24 @@ module.exports = function(input) {
     let {bot, cf, db} = input;
     let reactionMenus = {};
     let availableFunctions = {
+        // Button reactions
+        buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
+            "0": "<:bn_0:327896448081592330>",
+            "1": "<:bn_1:327896448232325130>",
+            "2": "<:bn_2:327896448505217037>",
+            "3": "<:bn_3:327896452363976704>",
+            "4": "<:bn_4:327896452464508929>",
+            "5": "<:bn_5:327896454733627403>",
+            "6": "<:bn_6:327896456369274880>",
+            "7": "<:bn_7:327896458067968002>",
+            "8": "<:bn_8:327896459070537728>",
+            "9": "<:bn_9:327896459292704769>",
+            "times": "<:bn_ti:327986149203116032>",
+            "person": "<:cbn_person:362387757592739850>",
+            "cards": "<:cbn_cards:362384965989826561>",
+            "plusminus": "<:bn_pm:327986149022760960>",
+            "right": "<:bn_fo:328724374465282049>"
+        },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
             if (!prefer) prefer = "";
@@ -124,7 +142,7 @@ module.exports = function(input) {
             if (!callback) callback = new Function();
             reaction = availableFunctions.emojiToObject(reaction); // Convert emoji strings to objects
             bot.getMessage({channelID: channelID, messageID: messageID}, function(err, res) { if (!err) {
-                cf.log(res.author.id);
+                //cf.log(res.author.id);
                 if (res.author.id == "309960863526289408") { // Don't add reactions to messages from RSRB
                     cf.log(`Skipping reacting to ${res.author.username} with ${reaction}`);
                     callback("RSRB");
@@ -257,22 +275,35 @@ module.exports = function(input) {
                 return;
             }
             if (!callback) callback = new Function();
-            availableFunctions.sendMessage(channelID, message, function(err, messageID) {
-                if (messageID) {
-                    availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
-                        callback(err, messageID);
-                    });
-                    reactionMenus[messageID] = {actions: actions, channelID: channelID};
-                } else {
-                    callback(err);
-                }
-            });
+            if (bot.users[channelID]) {
+                bot.createDMChannel(channelID, function(err, res) {
+                    if (err) callback(err);
+                    else {
+                        channelID = res.id;
+                        con();
+                    }
+                });
+            } else {
+                con();
+            }
+            function con() {
+                availableFunctions.sendMessage(channelID, message, function(err, messageID) {
+                    if (messageID) {
+                        availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
+                            callback(err, messageID);
+                        });
+                        reactionMenus[messageID] = {actions: actions, channelID: channelID};
+                    } else {
+                        callback(err);
+                    }
+                });
+            }
         }
     }
     // Make reaction menus work
     bot.on("messageReactionAdd", function(event) {
         if (event.d.user_id == bot.id) return;
-        cf.log(event, "info");
+        //cf.log(event, "info");
         if (reactionMenus[event.d.message_id]) {
             let menu = reactionMenus[event.d.message_id]; // "menu" is faster to type
             //cf.log(event.d.emoji.name+" // "+menu.actions[0].emoji+" // "+event.d.emoji.name==menu.actions[0].emoji);

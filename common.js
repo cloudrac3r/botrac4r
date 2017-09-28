@@ -109,19 +109,5 @@ module.exports = {
             }
         }
         return word;
-    },
-    // Turn an array into an English list.
-    listify: function(array, nothing) {
-        if (!nothing) nothing = "nothing";
-        switch (array.length) {
-        case 0:
-            return nothing; // For empty arrays, return "nothing" (or the supplied string)
-        case 1:
-            return array[0]; // For arrays with 1 item, just return that item
-        case 2:
-            return array[0]+" and "+array[1]; // For arrays with 2 items, connect them with " and ".
-        default:
-            return array[0]+", "+listify(array.slice(1)); // For arrays with more than 2 items, recurse.
-        }
     }
 }

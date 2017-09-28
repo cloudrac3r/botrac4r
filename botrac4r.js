@@ -74,14 +74,14 @@ function loadModules(module) {
                 Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db})); // Load it as bot commands
                 break;
             }
+            if (bot.connected) {
+                bf.sendMessage("244613376360054794", "Loaded **"+m.filename+"**");
+            }
         } catch (e) {
             if (bot.connected) {
                 bf.sendMessage("244613376360054794", "Failed to load module **"+m.filename+"**: `"+e+"`");
             }
             console.log("Failed to reload module "+m.filename+"\n"+e);
-        }
-        if (bot.connected) {
-            bf.sendMessage("244613376360054794", "Loaded **"+m.filename+"**");
         }
         if (!m.watched) { // If file isn't already being watched,
             m.watched = true;
