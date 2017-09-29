@@ -10,6 +10,7 @@ module.exports = function(input) {
     class Villager extends Card {
         constructor() {
             super("villager");
+            this.order = 1;
         }
         interact(game, player, finished) {
             let message = "";
@@ -22,6 +23,7 @@ module.exports = function(input) {
     class Werewolf extends Card {
         constructor() {
             super("werewolf");
+            this.order = 1;
         }
         interact(game, player, finished) {
             let message = "";
@@ -60,6 +62,7 @@ module.exports = function(input) {
     class Seer extends Card {
         constructor() {
             super("seer");
+            this.order = 1;
         }
         interact(game, player, finished) {
             let message = "As seer, you may examine either a single card of another player, or two cards from the centre.\n"+
@@ -104,15 +107,17 @@ module.exports = function(input) {
     class Robber extends Card {
         constructor() {
             super("robber");
+            this.order = 2;
         }
         interact(game, player, finished) {
             let message = "As robber, you may steal a card from another player.\n"+
                           "Choose the player that you want to steal from.\n";
             let info = game.getPlayerMenu([player.userID], function(event) {
                 let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                let newCard = player.exchangeCard(chosen);
-                bf.sendMessage(event.d.channel_id, "You stole and became a "+newCard.role+".");
-                finished();
+                bf.sendMessage(event.d.channel_id, "You stole and became a "+chosen.card.role+".");
+                finished(this.order, function() {
+                    let newCard = player.exchangeCard(chosen);
+                });
             });
             message += info.list;
             let actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
@@ -138,6 +143,7 @@ module.exports = function(input) {
             this.phase = "not started"; // "night", "day", "voting"
             this.timer = {time: 0, strict: false};
             this.progressCount = 0;
+            this.pendingActions = [];
         }
         // Return a list of the players in the game
         getPlayerMenu(exclude, actionData) {
@@ -227,8 +233,11 @@ module.exports = function(input) {
                             });
                             game.setUpCentreCards(cards)
                             game.players.forEach(p => {
-                                p.sendInteractMenu(game, event.d.channel_id, function() {
+                                p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
+                                    if (code) game.pendingActions.push({order: order, code: code});
                                     if (++game.progressCount == game.players.length) {
+                                        game.pendingActions.sort((a,b) => a.order-b.order).forEach(a => a.code());
+                                        game.pendingActions.length = 0;
                                         bf.sendMessage(channelID, "Everyone has interacted.");
                                         cf.log(game, "info");
                                     }
