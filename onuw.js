@@ -1,6 +1,43 @@
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
     let games = [];
+    class Team {
+        constructor(name) {
+            this.name = name;
+        }
+    }
+    class VillageTeam extends Team {
+        constructor() {
+            super("village");
+        }
+        isWinner(game, teamStatus) {
+            if ((teamStatus["werewolf"] || []).length == 0) { // No werewolves
+                if (teamStatus["village"].some(s => s == "dead")) { // Dead villagers
+                    return false;
+                } else {
+                    return true;
+                }
+            } else { // Werewolves
+                if (teamStatus["werewolf"].some(s => s == "dead")) { // Dead werewolves
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+    }
+    class WerewolfTeam extends Team {
+        constructor() {
+            super("werewolf");
+        }
+        isWinner(game, teamStatus) {
+            if (teamStatus["werewolf"].some(s => s == "dead")) { // Dead werewolves
+                return false;
+            } else {
+                return true;
+            }
+        }
+    }
     class Card {
         constructor(role, team) {
             this.role = role;
@@ -9,7 +46,7 @@ module.exports = function(input) {
     }
     class Villager extends Card {
         constructor() {
-            super("villager");
+            super("villager", new VillageTeam());
             this.order = 1;
         }
         interact(game, player, finished) {
@@ -22,7 +59,7 @@ module.exports = function(input) {
     }
     class Werewolf extends Card {
         constructor() {
-            super("werewolf");
+            super("werewolf", new WerewolfTeam());
             this.order = 1;
         }
         interact(game, player, finished) {
@@ -61,7 +98,7 @@ module.exports = function(input) {
     }
     class Seer extends Card {
         constructor() {
-            super("seer");
+            super("seer", new VillageTeam());
             this.order = 1;
         }
         interact(game, player, finished) {
@@ -106,7 +143,7 @@ module.exports = function(input) {
     }
     class Robber extends Card {
         constructor() {
-            super("robber");
+            super("robber", new VillageTeam());
             this.order = 2;
         }
         interact(game, player, finished) {
@@ -293,7 +330,30 @@ module.exports = function(input) {
                             let votesUsed = 0;
                             game.players.forEach(p => votesUsed += p.votesFor);
                             if (votesUsed == game.players.length) {
-                                bf.sendMessage(channelID, "WHOA!");
+                                let sortedPlayers = game.players.sort((a,b) => (b.votesFor-a.votesFor));
+                                let deadPlayers = (sortedPlayers[0].votesFor != 1 ? sortedPlayers.filter(p => p.votesFor == sortedPlayers[0].votesFor) : []);
+                                //let includedTeams = [];
+                                let teamStatus = {};
+                                sortedPlayers.forEach(p => {
+                                    //if (!includedTeams.map(t => t.name).includes(p.card.team.name)) includedTeams.push(p.card.team);
+                                    teamStatus[p.card.team.name] = teamStatus[p.card.team.name] || [];
+                                    teamStatus[p.card.team.name].push(deadPlayers.map(p => p.userID).includes(p.userID) ? "dead" : "alive");
+                                });
+                                bf.sendMessage(channelID,
+                                    "**The vote results are in!**\n"+
+                                    "Here are all the players, in order of votes:\n"+
+                                    sortedPlayers.map(p => (p.card.team.isWinner(game, teamStatus) ? "🎉" : "💩")+
+                                                           (deadPlayers.map(p => p.userID).includes(p.userID) ? "💀" : "😎")+" "+
+                                    `**${p.votesFor}**: <@${p.userID}> (${p.card.role})`).join("\n")+"\n"
+                                    //"Here are all the players that died:\n"+
+                                    //cf.listify(deadPlayers.map(p => bot.users[p.userID].username), "Nobody (because everyone received exactly one vote).")+"\n"+
+                                    //"Here is the result of all the teams:\n"+
+                                    //includedTeams.map(t => `${t.name}
+                                );
+                                cf.log(sortedPlayers, "info");
+                                cf.log(deadPlayers, "info");
+                                cf.log(teamStatus, "info");
+                                games = games.filter(g => g.channelID != game.channelID);
                             }
                         });
                     });

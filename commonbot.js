@@ -26,9 +26,9 @@ module.exports = function(input) {
             if (serverID) {
                 if (bot.servers[serverID].members[userID].nick) {
                     if (prefer.startsWith("user")) {
-                        return bot.users[userID].username+"( "+bot.servers[serverID].members[userID].nick+")";
+                        return bot.users[userID].username+" ("+bot.servers[serverID].members[userID].nick+")";
                     } else if (prefer.startsWith("nick")) {
-                        return bot.servers[serverID].members[userID].nick+"( "+bot.users[userID].username+")";
+                        return bot.servers[serverID].members[userID].nick+" ("+bot.users[userID].username+")";
                     } else {
                         return bot.servers[serverID].members[userID].nick;
                     }
