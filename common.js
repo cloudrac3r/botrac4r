@@ -48,6 +48,7 @@ module.exports = {
         if (!split) split = " ";
         if (!altSplit) altSplit = ";";
         let output = {};
+        output.input = input;
         output.words = input.split(split);
         output.regularWords = output.words.filter(i => !i.match(/^[+-][a-z]/i) && !i.match(/\w=[^\s]/));
         output.nonNumbers = output.regularWords.filter(i => parseFloat(i) != i);
@@ -64,6 +65,7 @@ module.exports = {
     },
     // Convert an array of strings to a humanised list.
     listify: function(array, empty) {
+        if (!array) array = [];
         if (!empty) empty = "nothing";
         switch (array.length) {
         case 0:

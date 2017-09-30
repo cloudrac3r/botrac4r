@@ -1,6 +1,6 @@
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
-    let game;
+    let games = [];
     class Card {
         constructor(role, team) {
             this.role = role;
@@ -188,6 +188,7 @@ module.exports = function(input) {
         constructor(userID) {
             this.userID = userID;
             this.card = undefined;
+            this.votesFor = 0;
         }
         // Swap cards with another player.
         exchangeCard(player) {
@@ -209,6 +210,16 @@ module.exports = function(input) {
             cf.log(menu.actions, "error");
             bf.reactionMenu(this.userID, "Your card is "+this.card.role+".\n"+menu.message, menu.actions);
         }
+        // Vote for whomst to kill.
+        startVoting(game, finished) {
+            let info = game.getPlayerMenu([], function(event) {
+                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                chosen.votesFor++;
+                bf.sendMessage(event.d.channel_id, "You voted for "+bot.users[chosen.userID].username+".");
+                finished();
+            });
+            bf.reactionMenu(this.userID, "Choose a user to vote for.\n"+info.list.join("\n"), info.actions);
+        }
     }
     let availableFunctions = {
         onuw: {
@@ -217,37 +228,79 @@ module.exports = function(input) {
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
-                game = new Game(channelID);
-                let template = "**One Night Ultimate Werewolf**\nCurrent players: ";
-                bf.reactionMenu(channelID, template+"nobody", [
-                    {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(event) {
-                        game.addOrRemove(event.d.user_id);
-                        game.addOrRemove("359203132980461568");
-                        bf.editMessage(channelID, event.d.message_id, template+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"));
-                    }},
-                    {emoji: bf.buttons["right"], remove: "all", ignore: "total", actionType: "js", actionData: function(event) {
-                        if (cardSets[game.players.length]) {
-                            let cards = [...cardSets[game.players.length]];
-                            game.players.forEach(p => {
-                                p.takeRandomCard(cards);
-                            });
-                            game.setUpCentreCards(cards)
-                            game.players.forEach(p => {
-                                p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
-                                    if (code) game.pendingActions.push({order: order, code: code});
-                                    if (++game.progressCount == game.players.length) {
-                                        game.pendingActions.sort((a,b) => a.order-b.order).forEach(a => a.code());
-                                        game.pendingActions.length = 0;
-                                        bf.sendMessage(channelID, "Everyone has interacted.");
-                                        cf.log(game, "info");
-                                    }
+                if (["new", "start", "join"].some(w => command.input.toLowerCase().includes(w))) {
+                    if (games.some(g => g.channelID == channelID)) {
+                        bf.sendMessage(channelID, "<@"+userID+"> There is already an ongoing game in this channel. Why not join in?");
+                        return;
+                    }
+                    let game = new Game(channelID);
+                    games.push(game);
+                    let template = "**One Night Ultimate Werewolf**\nCurrent players: ";
+                    bf.reactionMenu(channelID, template+"nobody", [
+                        {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(event) {
+                            game.addOrRemove(event.d.user_id);
+                            game.addOrRemove("359203132980461568");
+                            bf.editMessage(channelID, event.d.message_id, template+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"));
+                        }},
+                        {emoji: bf.buttons["right"], remove: "all", ignore: "total", actionType: "js", actionData: function(event) {
+                            if (cardSets[game.players.length]) {
+                                game.phase = "night";
+                                let cards = [...cardSets[game.players.length]];
+                                game.players.forEach(p => {
+                                    p.takeRandomCard(cards);
                                 });
-                            });
-                        } else {
-                            bf.sendMessage(channelID, `<@${event.d.user_id}> You cannot start the game with ${game.players.length} ${cf.plural("player", game.players.length)}.`);
-                        }
-                    }}
-                ]);
+                                game.setUpCentreCards(cards);
+                                game.players.forEach(p => {
+                                    p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
+                                        if (code) game.pendingActions.push({order: order, code: code});
+                                        if (++game.progressCount == game.players.length) {
+                                            game.pendingActions.sort((a,b) => a.order-b.order).forEach(a => a.code());
+                                            game.pendingActions.length = 0;
+                                            game.phase = "day";
+                                            bf.sendMessage(channelID, "Everyone has interacted.");
+                                            cf.log(games, "info");
+                                        }
+                                    });
+                                });
+                            } else {
+                                bf.sendMessage(channelID, `<@${event.d.user_id}> You cannot start the game with ${game.players.length} ${cf.plural("player", game.players.length)}.`);
+                            }
+                        }}
+                    ]);
+                } else if (["check", "info", "detail"].some(w => command.input.toLowerCase().includes(w))) {
+                    let game = games.filter(g => g.channelID == channelID)[0];
+                    if (game) {
+                        bf.sendMessage(channelID, "**Current ONUW game details**\n"+
+                            "**Players**: "+cf.listify(game.players.map(p => bot.users[p.userID].username).sort(), "nobody")+"\n"+
+                            "**Cards**: "+cf.listify((cardSets[game.players.length] || []).map(c => c.role), "N/A"));
+                    } else {
+                        bf.sendMessage(channelID, "There is no ongoing game in this channel.");
+                    }
+                } else if (["end", "stop", "quit", "vote"].some(w => command.input.toLowerCase().includes(w))) {
+                    let game = games.filter(g => g.channelID == channelID)[0];
+                    if (!game) {
+                        bf.sendMessage(channelID, "<@"+userID+"> There is no game in progress. Why not start a new one?");
+                        return;
+                    }
+                    if (game.phase != "day") {
+                        bf.sendMessage(channelID, "<@"+userID+"> The current game is not in a valid state to be stopped.");
+                        return;
+                    }
+                    bf.sendMessage(channelID, "The voting phase has started.");
+                    game.phase = "voting";
+                    game.players.forEach(p => {
+                        p.startVoting(game, function() {
+                            let votesUsed = 0;
+                            game.players.forEach(p => votesUsed += p.votesFor);
+                            if (votesUsed == game.players.length) {
+                                bf.sendMessage(channelID, "WHOA!");
+                            }
+                        });
+                    });
+                    cf.log(games, "info");
+                } else {
+                    bf.sendMessage(channelID, "<@"+userID+"> Incorrect command usage.");
+                }
             }
         }
     }
