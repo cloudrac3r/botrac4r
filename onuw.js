@@ -1,4 +1,5 @@
 module.exports = function(input) {
+    //TODO Add minion, drunk, tanner, insomniac, timer, only starter can start, prevent troublemaker self-swapping
     let {bot, cf, bf, db} = input;
     let games = [];
     class Team {
@@ -66,8 +67,8 @@ module.exports = function(input) {
             let message = "";
             let actions = [];
             let wolfList = game.players.filter(p => p.userID != player.userID)
-                                       .filter(p => p.card.role == "werewolf")
-                                       .map(p => p.userID);
+                                       .filter(p => ["werewolf", "dream wolf"].includes(p.card.role))
+                                       .map(p => ({userID: p.userID, type: p.card.role}));
             if (wolfList.length == 0) {
                 message = "There are no other werewolves in this game.\n"+
                           "As the lone wolf, you may look at a centre card by pressing a reaction.";
@@ -87,10 +88,10 @@ module.exports = function(input) {
                     {emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: actionManager},
                 ];
             } else if (wolfList.length == 1) {
-                message = "The other werewolf in this game is "+bf.userIDToNick(wolfList[0], game.serverID, "username")+".";
+                message = "The other werewolf in this game is "+bf.userIDToNick(wolfList[0].userID, game.serverID, "username")+" ("+wolfList[0].type+").";
                 finished();
             } else {
-                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => bf.userIDToNick(i, game.serverID, "username")))+".";
+                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users[i.userID].username+" ("+i.type+")"))+".";
                 finished();
             }
             return {message: message, actions: actions};
@@ -156,7 +157,7 @@ module.exports = function(input) {
                     let newCard = player.exchangeCard(chosen);
                 });
             });
-            message += info.list;
+            message += info.list.join("\n");
             let actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
                 bf.sendMessage(event.d.channel_id, "You decided not to steal from anybody. What a nice person you must be!!");
                 finished();
@@ -164,9 +165,114 @@ module.exports = function(input) {
             return {message: message, actions: actions};
         }
     }
+    class Troublemaker extends Card {
+        constructor() {
+            super("troublemaker", new VillageTeam());
+            this.order = 3;
+        }
+        interact(game, player, finished) {
+            let message = "As troublemaker, you may swap the cards of two other players.\n";
+            let actions = [];
+            let previouslyClicked;
+            let clickCount = 0;
+            let previousMessageID;
+            let info = game.getPlayerMenu([player.userID], function(event) {
+                // Enough players, get two and execute the swap
+                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                clickCount++;
+                if (!previouslyClicked) {
+                    previouslyClicked = chosen;
+                    bf.sendMessage(event.d.channel_id, bot.users[previouslyClicked.userID].username+"'s card will be swapped with...", function(e,id) {
+                        previousMessageID = id;
+                    });
+                } else if (previouslyClicked.userID == chosen.userID) {
+                    clickCount--;
+                } else if (clickCount == 2) {
+                    let message = bot.users[previouslyClicked.userID].username+"'s card has been swapped with "+bot.users[chosen.userID].username+"'s card.";
+                    if (previousMessageID) {
+                        bf.editMessage(event.d.channel_id, previousMessageID, message, function(e) {
+                            if (e) {
+                                bf.sendMessage(event.d.channel_id, message);
+                            }
+                        });
+                    } else {
+                        bf.sendMessage(event.d.channel_id, message);
+                    }
+                    finished(this.order, function() {
+                        chosen.exchangeCard(previouslyClicked);
+                    });
+                } else {
+                    bf.sendMessage(event.d.channel_id, "You have already completed your action.");
+                }
+            }, "this");
+            if (info.sorted.length < 2) {
+                message += "Unfortunately, there aren't enough players in this game for you to do that.";
+                finished();
+            } else {
+                message += "Choose the two players that you would like to swap.\n"+info.list.join("\n");
+                actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
+                    bf.sendMessage(event.d.channel_id, "You decided not swap any cards. Your loss.");
+                    finished();
+                }}]);
+            }
+            return {message: message, actions: actions};
+        }
+    }
+    class Mason extends Card {
+        constructor() {
+            super("mason", new VillageTeam());
+            this.order = 0;
+        }
+        interact(game, player, finished) {
+            let message = "As mason, you may see the other masons in this game.\n";
+            let actions = [];
+            let masonList = game.players.filter(p => p.userID != player.userID)
+                                       .filter(p => p.card.role == "mason")
+                                       .map(p => p.userID);
+            if (masonList.length == 0) {
+                message += "Nevermind, there aren't any others.";
+                finished();
+            } else if (masonList.length == 1) {
+                message += "The other mason in this game is "+bf.userIDToNick(masonList[0], game.serverID, "username")+".";
+                finished();
+            } else {
+                message += "The other masons in this game are "+cf.listify(masonList.map(i => bot.users[i].username))+".";
+                finished();
+            }
+            return {message: message, actions: actions};
+        }
+    }
+    class DreamWolf extends Card {
+        constructor() {
+            super("dream wolf", new WerewolfTeam());
+            this.order = 1
+        }
+        interact(game, player, finished) {
+            let message = "You are a werewolf, but you cannot see the other werewolves and you may not look at any centre cards.";
+            let actions = [];
+            finished();
+            return {message: message, actions: actions};
+        }
+    }
+    class Insomniac extends Card {
+        constructor() {
+            super("insomniac", new VillageTeam());
+            this.order = 999;
+        }
+        interact(game, player, finished) {
+            let message = "You will check your role at the end of the night.";
+            let actions = [];
+            finished(this.order, function() {
+                bf.sendMessage(player.userID, "You are now a "+player.card.role+".");
+            });
+            return {message: message, actions: actions};
+        }
+    }
     const cardSets = {
-        2: [new Robber(), new Seer(), new Werewolf(), new Robber(), new Robber()],
-        3: [new Werewolf(), new Werewolf(), new Seer(), new Seer(), new Seer(), new Seer()]
+        3: [new Werewolf(), new Werewolf(), new Robber(), new Seer(), new Troublemaker(), new Villager()],
+        4: [new Werewolf(), new Werewolf(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
+        5: [new Werewolf(), new Werewolf(), new Insomniac(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
+        6: [new Werewolf(), new Werewolf(), new DreamWolf(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason(), new Villager()]
     };
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
@@ -183,12 +289,13 @@ module.exports = function(input) {
             this.pendingActions = [];
         }
         // Return a list of the players in the game
-        getPlayerMenu(exclude, actionData) {
+        getPlayerMenu(exclude, actionData, ignore) {
+            if (!ignore) ignore = "total";
             let info = {};
             info.sorted = this.players.filter(p => !exclude.includes(p.userID))
                                       .sort((a,b) => (bf.userIDToNick(a.userID, this.serverID, "username") > bf.userIDToNick(b.userID, this.serverID, "username") ? 1 : -1));
             info.list = info.sorted.map((p,i) => `${bf.buttons[i+1+""]} ${bf.userIDToNick(p.userID, this.serverID, "username")}`);
-            info.actions = info.sorted.map((p,i) => ({emoji: bf.buttons[i+1+""], ignore: "total", actionType: "js", actionData: actionData}));
+            info.actions = info.sorted.map((p,i) => ({emoji: bf.buttons[i+1+""], ignore: ignore, actionType: "js", actionData: actionData}));
             //info.buttons = Object.keys({...[...new Array(5)]}).map(i => bf.buttons[parseInt(i)+1+""]);
             //info.IDs = info.sorted.map(p => p.userID);
             return info;
@@ -265,6 +372,10 @@ module.exports = function(input) {
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
+                if (bot.directMessages[channelID]) {
+                    bf.sendMessage(channelID, "You cannot use these commands in a direct message.");
+                    return;
+                }
                 if (["new", "start", "join"].some(w => command.input.toLowerCase().includes(w))) {
                     if (games.some(g => g.channelID == channelID)) {
                         bf.sendMessage(channelID, "<@"+userID+"> There is already an ongoing game in this channel. Why not join in?");
@@ -272,15 +383,17 @@ module.exports = function(input) {
                     }
                     let game = new Game(channelID);
                     games.push(game);
-                    let template = "**One Night Ultimate Werewolf**\nCurrent players: ";
-                    bf.reactionMenu(channelID, template+"nobody", [
+                    let template = "**One Night Ultimate Werewolf**\n";
+                    let id;
+                    bf.reactionMenu(channelID, template+"Current players (**"+game.players.length+"**): nobody", [
                         {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(event) {
                             game.addOrRemove(event.d.user_id);
-                            game.addOrRemove("359203132980461568");
-                            bf.editMessage(channelID, event.d.message_id, template+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"));
+                            //game.addOrRemove("359203132980461568");
+                            bf.editMessage(channelID, event.d.message_id, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"));
                         }},
-                        {emoji: bf.buttons["right"], remove: "all", ignore: "total", actionType: "js", actionData: function(event) {
+                        {emoji: bf.buttons["right"], remove: "user", actionType: "js", actionData: function(event) {
                             if (cardSets[game.players.length]) {
+                                bot.deleteMessage({channelID: game.channelID, messageID: id});
                                 game.phase = "night";
                                 let cards = [...cardSets[game.players.length]];
                                 game.players.forEach(p => {
@@ -288,6 +401,7 @@ module.exports = function(input) {
                                 });
                                 game.setUpCentreCards(cards);
                                 game.players.forEach(p => {
+                                    bot.mute({userID: p.userID, serverID: game.serverID});
                                     p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
                                         if (code) game.pendingActions.push({order: order, code: code});
                                         if (++game.progressCount == game.players.length) {
@@ -296,14 +410,16 @@ module.exports = function(input) {
                                             game.phase = "day";
                                             bf.sendMessage(channelID, "Everyone has interacted.");
                                             cf.log(games, "info");
+                                            game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
                                         }
                                     });
                                 });
                             } else {
                                 bf.sendMessage(channelID, `<@${event.d.user_id}> You cannot start the game with ${game.players.length} ${cf.plural("player", game.players.length)}.`);
+                                //games = games.filter(g => g.channelID != game.channelID);
                             }
                         }}
-                    ]);
+                    ], (e,r) => {id = r});
                 } else if (["check", "info", "detail"].some(w => command.input.toLowerCase().includes(w))) {
                     let game = games.filter(g => g.channelID == channelID)[0];
                     if (game) {
@@ -326,6 +442,7 @@ module.exports = function(input) {
                     bf.sendMessage(channelID, "The voting phase has started.");
                     game.phase = "voting";
                     game.players.forEach(p => {
+                        bot.mute({userID: p.userID, serverID: game.serverID});
                         p.startVoting(game, function() {
                             let votesUsed = 0;
                             game.players.forEach(p => votesUsed += p.votesFor);
@@ -342,8 +459,8 @@ module.exports = function(input) {
                                 bf.sendMessage(channelID,
                                     "**The vote results are in!**\n"+
                                     "Here are all the players, in order of votes:\n"+
-                                    sortedPlayers.map(p => (p.card.team.isWinner(game, teamStatus) ? "🎉" : "💩")+
-                                                           (deadPlayers.map(p => p.userID).includes(p.userID) ? "💀" : "😎")+" "+
+                                    sortedPlayers.map(p => (p.card.team.isWinner(game, teamStatus) ? "🏆" : "🥔")+
+                                                           (deadPlayers.map(p => p.userID).includes(p.userID) ? "💀" : "❤")+" "+
                                     `**${p.votesFor}**: <@${p.userID}> (${p.card.role})`).join("\n")+"\n"
                                     //"Here are all the players that died:\n"+
                                     //cf.listify(deadPlayers.map(p => bot.users[p.userID].username), "Nobody (because everyone received exactly one vote).")+"\n"+
@@ -354,6 +471,7 @@ module.exports = function(input) {
                                 cf.log(deadPlayers, "info");
                                 cf.log(teamStatus, "info");
                                 games = games.filter(g => g.channelID != game.channelID);
+                                game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
                             }
                         });
                     });
