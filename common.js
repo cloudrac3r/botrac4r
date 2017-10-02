@@ -13,6 +13,18 @@ module.exports = {
         if (!seperator) seperator = "";
         return d.getHours().toString().padStart(2, "0")+seperator+d.getMinutes().toString().padStart(2, "0")+seperator+d.getSeconds().toString().padStart(2, "0");
     },
+    // Prepend the appropriate indefinite article to a string.
+    indefArtify(string, plural) {
+        if (plural) {
+            return "some "+string;
+        } else {
+            if (string.match(/^[aeiou]/)) {
+                return "an "+string;
+            } else {
+                return "a "+string;
+            }
+        }
+    },
     // Get specific arguments from a string.
     sarg: function(input, count, char) {
         if (!char) char = " "; // Split at spaces unless told otherwise
