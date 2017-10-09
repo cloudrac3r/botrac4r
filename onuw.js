@@ -1,5 +1,5 @@
 module.exports = function(input) {
-    //TODO Add minion, drunk, tanner, insomniac, timer, only starter can start, prevent troublemaker self-swapping
+    //TODO Add minion, drunk, tanner, timer, only starter can start, prevent troublemaker self-swapping
     let {bot, cf, bf, db} = input;
     let games = [];
     class Team {
@@ -263,12 +263,13 @@ module.exports = function(input) {
             let message = "You will check your role at the end of the night.";
             let actions = [];
             finished(this.order, function() {
-                bf.sendMessage(player.userID, "You are now a "+player.card.role+".");
+                bf.sendMessage(player.userID, "You are now "+cf.indefArtify(player.card.role)+".");
             });
             return {message: message, actions: actions};
         }
     }
     const cardSets = {
+        2: [new Werewolf(), new Werewolf(), new Robber(), new Seer(), new Troublemaker()],
         3: [new Werewolf(), new Werewolf(), new Robber(), new Seer(), new Troublemaker(), new Villager()],
         4: [new Werewolf(), new Werewolf(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
         5: [new Werewolf(), new Werewolf(), new Insomniac(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
@@ -276,6 +277,9 @@ module.exports = function(input) {
     };
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
+        if (bot.connected) {
+            bot.sendMessage("244613376360054794", "ONUW role set "+n+" does not have the correct array length.");
+        }
     });
     class Game {
         constructor(channelID) { // Set up new game

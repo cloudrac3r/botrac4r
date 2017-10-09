@@ -42,7 +42,11 @@ module.exports = function(input) {
             if (bot.users[channelID]) {
                 channelName = "@"+bot.users[channelID].username;
             } else if (bot.directMessages[channelID]) {
-                channelName = "@"+bot.directMessages[channelID].recipient.username;
+                /*if (bot.directMessages[channelID].recipients) { // Using LC's lib
+                    channelName = "@"+bot.directMessages[channelID].recipients[0].username;
+                } else { // Not using LC's lib*/
+                    channelName = "@"+bot.directMessages[channelID].recipient.username;
+                /*}*/
             } else {
                 channelName = "#"+bot.channels[channelID].name;
             }

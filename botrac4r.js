@@ -27,7 +27,7 @@ let defaultAltSplit = ";";
 let defaultMentionPref = 1;
 let configurables;
 
-let Discord = require("discord.io"); // Important libraries
+let Discord = require("discord.io-gateway_v6"); // Switch to a fork of discord.io with gateway v6 support
 let fs = require("fs");
 let request = require("request");
 let sqlite = require("sqlite3");

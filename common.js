@@ -76,9 +76,10 @@ module.exports = {
         return array[module.exports.rint(0, array.length-1)];
     },
     // Convert an array of strings to a humanised list.
-    listify: function(array, empty) {
+    listify: function(array, empty, surround) {
         if (!array) array = [];
         if (!empty) empty = "nothing";
+        if (surround) array = array.map(i => surround+i+surround);
         switch (array.length) {
         case 0:
             return empty; // For empty arrays, return "nothing" (or the specified result)
