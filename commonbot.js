@@ -135,7 +135,7 @@ module.exports = function(input) {
             });
         },
         // React to a message.
-        addReaction: function(channelID, messageID, reaction, callback) {
+        addReaction: function(channelID, messageID, reaction, callback, RSRBcheck) {
             if (!channelID) {
                 cf.log("Need a channelID to react in", "warning");
                 return;
@@ -150,13 +150,22 @@ module.exports = function(input) {
             }
             if (!callback) callback = new Function();
             reaction = availableFunctions.emojiToObject(reaction); // Convert emoji strings to objects
-            bot.getMessage({channelID: channelID, messageID: messageID}, function(err, res) { if (!err) {
-                //cf.log(res.author.id);
-                if (res.author.id == "309960863526289408") { // Don't add reactions to messages from RSRB
-                    cf.log(`Skipping reacting to ${res.author.username} with ${reaction}`);
-                    callback("RSRB");
-                    return;
+            new Promise(function(resolve, reject) {
+                if (!RSRBcheck) {
+                    resolve();
+                } else {
+                    bot.getMessage({channelID: channelID, messageID: messageID}, function(err, res) { if (!err) {
+                        //cf.log(res.author.id);
+                        if (res.author.id == "309960863526289408") { // Don't add reactions to messages from RSRB
+                            cf.log(`Skipping reacting to ${res.author.username} with ${reaction}`, "warning");
+                            callback("RSRB");
+                            reject();
+                        } else {
+                            resolve();
+                        }
+                    }});
                 }
+            }).then(function() {
                 bot.addReaction({channelID: channelID, messageID: messageID, reaction: reaction}, function(err, res) {
                     if (err) {
                         if (err.statusMessage == "TOO MANY REQUESTS") {
@@ -174,7 +183,7 @@ module.exports = function(input) {
                         callback(err, res);
                     }
                 });
-            }});
+            });
         },
         // Add multiple reactions to a message, in order.
         addReactions: function(channelID, messageID, reactions, callback) {
