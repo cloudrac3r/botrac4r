@@ -36,6 +36,11 @@ module.exports = function(input) {
             }
             return bot.users[userID].username;
         },
+        // Given a userID and serverID, return the colour of the user's name.
+        userIDToColour: function(userID, serverID) {
+            let role = bot.servers[serverID].members[userID].roles.map(r => bot.servers[serverID].roles[r]).sort((a,b) => b.position-a.position).filter(r => r.color != 0)[0];
+            return role ? role.color : 0x808080;
+        },
         // Given a userID or channelID, return its display name.
         nameOfChannel: function(channelID) {
             let channelName = "an unnamed channel";

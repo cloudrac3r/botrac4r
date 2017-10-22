@@ -24,7 +24,7 @@ module.exports = function(input) {
         choose: {
             aliases: ["choose", "choice", "pick"],
             shortHelp: "Choose one items from a list.",
-            reference: "[t=*title*] *item1* [*item2*] [*item3*] [*...*]",
+            reference: "[+t *title*] *item1* [*item2*] [*item3*] [*...*]",
             longHelp: "Put a series of words seperated by AS to choose exactly one of them.",
             code: function(userID, channelID, command, d) {
                 if (command.altWords[0] == "") {
@@ -32,7 +32,8 @@ module.exports = function(input) {
                     return;
                 }
                 let result = cf.rarray(command.altWords);
-                let message = `From ${cf.listify(command.altWords, "nothing", "`")}, ${(command.switches.t ? command.switches.t+" is" : "I choose")}`;
+                let title = command.flags.on.includes("t") ? command.altWords.shift() : "I choose";
+                let message = `From ${cf.listify(command.altWords, "nothing", "`")}, ${title}`;
                 bf.sendMessage(channelID, `${message}: **${result}**`);
             }
         },

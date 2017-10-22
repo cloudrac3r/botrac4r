@@ -64,7 +64,7 @@ module.exports = {
         output.words = input.split(split);
         output.regularWords = output.words.filter(i => !i.match(/^[+-][a-z]/i) && !i.match(/\w=[^\s]/));
         output.nonNumbers = output.regularWords.filter(i => parseFloat(i) != i);
-        output.altWords = input.split(altSplit).map(i => module.exports.trim(i, split));
+        output.altWords = output.regularWords.join(split).split(altSplit).map(i => module.exports.trim(i, split));
         output.numbers = output.regularWords.filter(i => parseFloat(i) == i);
         output.flags = {on: output.words.filter(i => i.match(/^\+[a-z]/i)).map(i => i.slice(1)), off: output.words.filter(i => i.match(/^-[a-z]/i)).map(i => i.slice(1))};
         output.switches = {};
