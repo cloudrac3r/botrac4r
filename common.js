@@ -59,7 +59,7 @@ module.exports = {
     carg: function(input, split, altSplit) {
         if (!split) split = " ";
         if (!altSplit) altSplit = ";";
-        let output = {};
+        let output = {split: split, altSplit: altSplit};
         output.input = input;
         output.words = input.split(split);
         output.regularWords = output.words.filter(i => !i.match(/^[+-][a-z]/i) && !i.match(/\w=[^\s]/));
