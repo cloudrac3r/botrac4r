@@ -71,11 +71,12 @@ module.exports = function(input) {
         },
         // Send a message to a channel.
         sendMessage: function(channelID, message, callback, additional) {
+            if (!additional) additional = {};
             if (!channelID) { // Obviously a channelID is needed
                 cf.log("Need a channelID to send a message to", "warning");
                 return;
             }
-            if (!message) { // Empty messages don't work, so don't try
+            if (!message && !additional.embed) { // Empty messages don't work, so don't try
                 cf.log("Cannot send empty message", "warning");
                 return;
             }
@@ -99,7 +100,11 @@ module.exports = function(input) {
                         callback(err);
                     }
                 } else { // Success
-                    cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message}`, "spam"); // Log information about what happened
+                    if (additional.embed) {
+                        cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`); // Log information about what happened
+                    } else {
+                        cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message}`, "spam");
+                    }
                     callback(err, res.id, res);
                 }
             });
