@@ -49,6 +49,27 @@ module.exports = function(input) {
                 //cf.log(bot);
             }
         },
+        temp: {
+            aliases: ["temp", "temperature", "celsius", "farenheit"],
+            shortHelp: "Convert a temperature from Celsius to Farenheit or vice-versa.",
+            reference: "*temperature*",
+            longHelp: "Put exactly one number without a unit and it will be converted in both directions.",
+            code: function(userID, channelID, command, d) {
+                if (!command.numbers[0]) {
+                    bf.sendMessage(channelID, "No temperature was given, so I cannot convert.");
+                    return;
+                }
+                let input = (parseFloat(command.numbers[0]).toFixed(1).length+"") < (parseFloat(command.numbers[0])+"").length ?
+                    parseFloat(command.numbers[0]).toFixed(1)
+                  : parseFloat(command.numbers[0]);
+                let CtoF = (input*1.8+32).toFixed(1);
+                let FtoC = ((input-32)/1.8).toFixed(1);
+                let response = (command.nonNumbers.join(command.split) ?
+                    "​"+command.nonNumbers.join(command.split)+": "+input+"°C = **"+CtoF+"°F** / "+input+"°F = **"+FtoC+"°C**." // Zero-width space
+                  : input+"°C = **"+CtoF+"°F** and "+input+"°F = **"+FtoC+"°C**.");
+                bf.sendMessage(channelID, response);
+            }
+        },
         yesno: {
             aliases: ["yn", "yesno", "8ball"],
             shortHelp: "Answer a question with yes or no.",
@@ -59,12 +80,15 @@ module.exports = function(input) {
                     ["yes"],
                     ["no"]
                 ];
-                let yesChance = (parseFloat(command.switches.yes) || 100-parseFloat(command.switches.no) || parseFloat(command.numbers[0]) || 50);
+                let yesChance = ((parseFloat(command.switches.yes) >= 0 && parseFloat(command.switches.yes) <= 100 ? parseFloat(command.switches.yes)+"" : false)
+                 || (parseFloat(command.switches.no) >= 0 && parseFloat(command.switches.no) <= 100 ? 100-parseFloat(command.switches.no)+"" : false)
+                 || (parseFloat(command.numbers[0]) >= 0 && parseFloat(command.numbers[0]) <= 100 ? parseFloat(command.numbers[0])+"" : false)
+                 || 50);
                 cf.log(yesChance, "error");
-                let question = (command.nonNumbers[0] ? `"${command.nonNumbers[0]}"` : "do something");
+                let question = (command.nonNumbers[0] ? command.nonNumbers.join(command.split) : "do something");
                 let yn = (Math.random()*100 < yesChance ? 0 : 1);
                 let response = cf.rarray(words[yn]);
-                bf.sendMessage(channelID, `Deciding if you should ${question}: **${response}**`);
+                bf.sendMessage(channelID, `Deciding if you should ${question}: **${response}** *(luck: ${yesChance}%)*`);
             }
         },
         setup: {
