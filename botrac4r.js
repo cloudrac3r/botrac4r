@@ -17,7 +17,7 @@ let modules = [ // Load these modules on startup and on change
         filename: "./onuw.js",
         dest: "bot commands"
     },{
-        filename: "./pinarchive.js",
+        filename: "./pinarchive/pinarchive.js",
         dest: "bot commands"
     }
 ];
