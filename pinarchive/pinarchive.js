@@ -1,7 +1,7 @@
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
     let sqlite = require("sqlite3");
-    let pindb = new sqlite.Database("./pinarchive.db");
+    let pindb = new sqlite.Database("./pinarchive/pinarchive.db");
     bot.on("message", function(user, userID, channelID, message, event) {
         if (message == "test pin" || event.d.type == 6) { //TODO: remove trigger message
             cf.log("Pin detected", "info");
