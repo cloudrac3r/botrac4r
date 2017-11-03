@@ -19,6 +19,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: "./pinarchive/pinarchive.js",
         dest: "bot commands"
+    },{
+        filename: "./timezone/timezone.js",
+        dest: "bot commands"
     }
 ];
 
