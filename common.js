@@ -124,5 +124,19 @@ module.exports = {
             }
         }
         return word;
+    },
+    // Get a XX:XX:XX formatted string from a Date object (UTC time).
+    getReadableTime: function(date, detail, ampm) {
+        let result;
+        if (ampm) {
+            result = (date.getUTCHours()%12 || 12).toString()+":"+date.getUTCMinutes().toString().padStart(2, "0")+":"+date.getUTCSeconds().toString().padStart(2, "0");
+        } else {
+            result = date.getUTCHours().toString()+":"+date.getUTCMinutes().toString().padStart(2, "0")+":"+date.getUTCSeconds().toString().padStart(2, "0");
+        }
+        if (detail) {
+            result = result.split(":").slice(0, detail).join(":");
+        }
+        if (ampm) result += " "+(date.getUTCHours() < 12 ? "AM" : "PM");
+        return result;
     }
 }
