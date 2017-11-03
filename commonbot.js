@@ -80,7 +80,12 @@ module.exports = function(input) {
                 cf.log("Cannot send empty message", "warning");
                 return;
             }
-            if (!callback) callback = new Function(); // Create an empty callback to fall back to
+            if (typeof(callback) == "object") {
+                additional = callback;
+                callback = new Function();
+            } else if (typeof(callback) != "function") {
+                callback = new Function(); // Create an empty callback function to use instead
+            }
             if (typeof(message) == "object") { // Convert objects to strings
                 if (additional.largeObject) {
                     message = JSON.stringify(message, null, 4);
@@ -88,25 +93,39 @@ module.exports = function(input) {
                     message = JSON.stringify(message);
                 }
             }
-            bot.sendMessage(Object.assign({to: channelID, message: message}, additional), function(err, res) { // Actually send the message
-                if (err) { // Handle various errors
-                    if (err.statusMessage == "TOO MANY REQUESTS") { // Rate limit
-                        cf.log("Message blocked by rate limit, retrying in "+err.response.retry_after, "info");
-                        setTimeout(function() { // Try again after the timeout
-                            availableFunctions.sendMessage(channelID, message, callback, additional);
-                        }, err.response.retry_after);
-                    } else { // Unknown error
-                        cf.log(cf.stringify(err, true), "error");
-                        callback(err);
-                    }
-                } else { // Success
-                    if (additional.embed) {
-                        cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`); // Log information about what happened
-                    } else {
-                        cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message}`, "spam");
-                    }
-                    callback(err, res.id, res);
+            new Promise(function(resolve, reject) {
+                if (additional.mention) {
+                    db.get("SELECT mention FROM Users WHERE userID = ?", additional.mention, function(err, dbr) {
+                        if (dbr.mention == 1) {
+                            message = "<@"+additional.mention+"> "+message;
+                        }
+                        delete additional.mention;
+                        resolve();
+                    });
+                } else {
+                    resolve();
                 }
+            }).then(function() {
+                bot.sendMessage(Object.assign({to: channelID, message: message}, additional), function(err, res) { // Actually send the message
+                    if (err) { // Handle various errors
+                        if (err.statusMessage == "TOO MANY REQUESTS") { // Rate limit
+                            cf.log("Message blocked by rate limit, retrying in "+err.response.retry_after, "info");
+                            setTimeout(function() { // Try again after the timeout
+                                availableFunctions.sendMessage(channelID, message, callback, additional);
+                            }, err.response.retry_after);
+                        } else { // Unknown error
+                            cf.log(cf.stringify(err, true), "error");
+                            callback(err);
+                        }
+                    } else { // Success
+                        if (additional.embed) {
+                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`); // Log information about what happened
+                        } else {
+                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message}`, "spam");
+                        }
+                        callback(err, res.id, res);
+                    }
+                });
             });
         },
         // Edit a message sent by the bot.
