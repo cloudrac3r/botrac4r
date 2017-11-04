@@ -18,7 +18,7 @@ module.exports = function(input) {
                 }
                 let result = cf.rint(min, max); // Pick the number
                 let message = (command.switches.message || command.nonNumbers.join(" ") || "a number"); // Get the input message
-                bf.sendMessage(channelID, `Choosing ${message} from ${min} to ${max}: **${result}**`); // Send it all back
+                bf.sendMessage(channelID, `Choosing ${message} from ${min} to ${max}: **${result}**`, {mention: userID}); // Send it all back
             }
         },
         choose: {
@@ -28,25 +28,13 @@ module.exports = function(input) {
             longHelp: "Put a series of words seperated by AS to choose exactly one of them.",
             code: function(userID, channelID, command, d) {
                 if (command.altWords[0] == "") {
-                    bf.sendMessage(channelID, "No choices were given, so I cannot choose.");
+                    bf.sendMessage(channelID, "No choices were given, so I cannot choose.", {mention: userID});
                     return;
                 }
                 let result = cf.rarray(command.altWords);
                 let title = command.flags.on.includes("t") ? command.altWords.shift() : "I choose";
                 let message = `From ${cf.listify(command.altWords, "nothing", "`")}, ${title}`;
-                bf.sendMessage(channelID, `${message}: **${result}**`);
-            }
-        },
-        menu: {
-            aliases: ["menu"],
-            code: function(userID, channelID, command, d) {
-                bf.reactionMenu(channelID, "Test reaction menu", [
-                    {emoji: "🙂", remove: "user", ignore: "that", actionType: "reply", actionData: "You clicked the slight smile."},
-                    {emoji: "😄", remove: "user", ignore: "total", actionType: "reply", actionData: "You clicked the big smile."},
-                    {emoji: "<:hippo:268962438181945345>", remove: "user", ignore: "that", actionType: "reply", actionData: "You clicked the hippo."},
-                    {emoji: "📄", remove: "user", ignore: "that", actionType: "js", actionData: function(ev, r) {bf.sendMessage(r[Object.keys(r)[0]].channelID, "```"+cf.stringify(ev, true)+"```")}}
-                ]);
-                //cf.log(bot);
+                bf.sendMessage(channelID, `${message}: **${result}**`, {mention: userID});
             }
         },
         temp: {
@@ -56,7 +44,7 @@ module.exports = function(input) {
             longHelp: "Put exactly one number without a unit and it will be converted in both directions.",
             code: function(userID, channelID, command, d) {
                 if (!command.numbers[0]) {
-                    bf.sendMessage(channelID, "No temperature was given, so I cannot convert.");
+                    bf.sendMessage(channelID, "No temperature was given, so I cannot convert.", {mention: userID});
                     return;
                 }
                 let input = (parseFloat(command.numbers[0]).toFixed(1).length+"") < (parseFloat(command.numbers[0])+"").length ?
@@ -67,7 +55,7 @@ module.exports = function(input) {
                 let response = (command.nonNumbers.join(command.split) ?
                     "​"+command.nonNumbers.join(command.split)+": "+input+"°C = **"+CtoF+"°F** / "+input+"°F = **"+FtoC+"°C**." // Zero-width space
                   : input+"°C = **"+CtoF+"°F** and "+input+"°F = **"+FtoC+"°C**.");
-                bf.sendMessage(channelID, response);
+                bf.sendMessage(channelID, response, {mention: userID});
             }
         },
         yesno: {
@@ -88,7 +76,7 @@ module.exports = function(input) {
                 let question = (command.nonNumbers[0] ? command.nonNumbers.join(command.split) : "do something");
                 let yn = (Math.random()*100 < yesChance ? 0 : 1);
                 let response = cf.rarray(words[yn]);
-                bf.sendMessage(channelID, `Deciding if you should ${question}: **${response}** *(luck: ${yesChance}%)*`);
+                bf.sendMessage(channelID, `Deciding if you should ${question}: **${response}** *(luck: ${yesChance}%)*`, {mention: userID});
             }
         },
         setup: {

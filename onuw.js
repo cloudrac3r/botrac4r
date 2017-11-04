@@ -278,7 +278,7 @@ module.exports = function(input) {
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
         if (bot.connected) {
-            bot.sendMessage("244613376360054794", "ONUW role set "+n+" does not have the correct array length.");
+            bf.sendMessage("244613376360054794", "ONUW role set "+n+" does not have the correct array length.");
         }
     });
     class Game {
@@ -429,18 +429,19 @@ module.exports = function(input) {
                     if (game) {
                         bf.sendMessage(channelID, "**Current ONUW game details**\n"+
                             "**Players**: "+cf.listify(game.players.map(p => bot.users[p.userID].username).sort(), "nobody")+"\n"+
-                            "**Cards**: "+cf.listify((cardSets[game.players.length] || []).map(c => c.role), "N/A"));
+                            "**Cards**: "+cf.listify((cardSets[game.players.length] || []).map(c => c.role), "N/A"),
+                            {mention: userID});
                     } else {
-                        bf.sendMessage(channelID, "There is no ongoing game in this channel.");
+                        bf.sendMessage(channelID, "There is no ongoing game in this channel.", {mention: userID});
                     }
                 } else if (["end", "stop", "quit", "vote"].some(w => command.input.toLowerCase().includes(w))) {
                     let game = games.filter(g => g.channelID == channelID)[0];
                     if (!game) {
-                        bf.sendMessage(channelID, "<@"+userID+"> There is no game in progress. Why not start a new one?");
+                        bf.sendMessage(channelID, "There is no game in progress. Why not start a new one?", {mention: userID});
                         return;
                     }
                     if (game.phase != "day") {
-                        bf.sendMessage(channelID, "<@"+userID+"> The current game is not in a valid state to be stopped.");
+                        bf.sendMessage(channelID, "The current game is not in a valid state to be stopped.", {mention: userID});
                         return;
                     }
                     bf.sendMessage(channelID, "The voting phase has started.");
@@ -481,7 +482,7 @@ module.exports = function(input) {
                     });
                     cf.log(games, "info");
                 } else {
-                    bf.sendMessage(channelID, "<@"+userID+"> Incorrect command usage.");
+                    bf.sendMessage(channelID, "Incorrect command usage.", {mention: userID});
                 }
             }
         }
