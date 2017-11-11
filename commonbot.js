@@ -2,8 +2,9 @@ module.exports = function(input) {
     let {bot, cf, db} = input;
     let reactionMenus = {};
     let availableFunctions = {
-        // Button reactions
+        // Button reactions.
         buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
+            // Numbers
             "0": "<:bn_0:327896448081592330>",
             "1": "<:bn_1:327896448232325130>",
             "2": "<:bn_2:327896448505217037>",
@@ -14,11 +15,19 @@ module.exports = function(input) {
             "7": "<:bn_7:327896458067968002>",
             "8": "<:bn_8:327896459070537728>",
             "9": "<:bn_9:327896459292704769>",
+            // Punctuation
+            "question": "<:bn_qu:331164190267932672>",
+            // Operators
             "times": "<:bn_ti:327986149203116032>",
+            "plusminus": "<:bn_pm:327986149022760960>",
+            // Arrows
+            "right": "<:bn_fo:328724374465282049>",
+            "redo": "<:bn_re:362741439211503616>",
+            // Other symbols
             "person": "<:cbn_person:362387757592739850>",
             "cards": "<:cbn_cards:362384965989826561>",
-            "plusminus": "<:bn_pm:327986149022760960>",
-            "right": "<:bn_fo:328724374465282049>"
+            "info": "<:cbn_info:377710017627029505>",
+            "tick": "<:cbn_tick:378414422219161601>"
         },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
@@ -113,6 +122,13 @@ module.exports = function(input) {
                             setTimeout(function() { // Try again after the timeout
                                 availableFunctions.sendMessage(channelID, message, callback, additional);
                             }, err.response.retry_after);
+                        } else if (err.response.content.match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
+                            if (additional.characterLimit) {
+                                delete additional.characterLimit; // Prevent the error message from hitting the character limit again
+                                availableFunctions.sendMessage(channelID, additional.characterLimit, callback, additional);
+                            } else {
+                                availableFunctions.sendMessage(channelID, "Oops. I didn't manage to send a message because it exceeded Discord's character limit. This was probably your fault.", callback, additional);
+                            }
                         } else { // Unknown error
                             cf.log(cf.stringify(err, true), "error");
                             callback(err);
@@ -308,6 +324,7 @@ module.exports = function(input) {
         },
         // Create a reaction menu
         reactionMenu: function(channelID, message, actions, callback) { // actions = [{emoji: {name: "", id: ""}, actionType: "(reply|js)", actionData: (Function|String)}, ...]
+            let isID = false;
             if (!channelID) {
                 cf.log("Need a channelID to put a menu in", "warning");
                 return;
@@ -317,29 +334,87 @@ module.exports = function(input) {
                 return;
             }
             if (!callback) callback = new Function();
-            if (bot.users[channelID]) {
-                bot.createDMChannel(channelID, function(err, res) {
-                    if (err) callback(err);
-                    else {
-                        channelID = res.id;
-                        con();
+            new Promise(function(resolve, reject) {
+                if (message.match(/^[0-9]{16,}$/)) { // If message is actually a messageID
+                    bot.getMessage({channelID: channelID, messageID: messageID}, function(e,r) { // Make sure it's valid
+                        try { // If messageID is not valid,
+                            if (e.response.message == "Unknown Message") {
+                                resolve(); // continue
+                            }
+                        } catch (e) { // If messageID is valid
+                            isID = true;
+                            resolve();
+                        }
+                    });
+                } else { // If message is a message,
+                    resolve(); // continue
+                }
+            }).then(function() {
+                new Promise(function(resolve, reject) {
+                    if (isID) {
+                        resolve();
+                    } else if (bot.users[channelID]) {
+                        bot.createDMChannel(channelID, function(err, res) {
+                            if (err) callback(err);
+                            else {
+                                channelID = res.id;
+                                resolve();
+                            }
+                        });
+                    } else {
+                        resolve();
+                    }
+                }).then(function() {
+                    if (!isID) {
+                        availableFunctions.sendMessage(channelID, message, function(err, messageID) {
+                            if (messageID) {
+                                availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
+                                    callback(err, messageID);
+                                });
+                                reactionMenus[messageID] = {actions: actions, channelID: channelID};
+                            } else {
+                                callback(err);
+                            }
+                        });
+                    } else {
+                        availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
+                            callback(err, message);
+                        });
+                        reactionMenus[message] = {actions: actions, channelID: channelID};
                     }
                 });
-            } else {
-                con();
+            });
+        },
+        // Create a channel
+        createChannel(serverID, name, type, parentID, callback) {
+            if (!serverID) {
+                cf.log("Need a serverID to create a channel in", "warning");
+                return;
             }
-            function con() {
-                availableFunctions.sendMessage(channelID, message, function(err, messageID) {
-                    if (messageID) {
-                        availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
-                            callback(err, messageID);
-                        });
-                        reactionMenus[messageID] = {actions: actions, channelID: channelID};
+            if (!name) {
+                cf.log("Need a name to give to the new channel", "warning");
+                return;
+            }
+            if (!["text", "voice"].includes(type)) {
+                cf.log('Need a type of channel to create (either "text" or "voice")');
+                return;
+            }
+            if (!parentID) parentID = undefined;
+            if (!callback) callback = new Function();
+            bot.createChannel({serverID: serverID, name: name, type: type, parentID: parentID}, function(err, res) {
+                if (err) {
+                    if ((err.response.name[0] || "").startsWith("Text channel names")) {
+                        cf.log(err.response.name[0], "warning");
+                        callback(err);
                     } else {
+                        cf.log(cf.stringify(err, true), "error");
                         callback(err);
                     }
-                });
-            }
+                } else {
+                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers[serverID].name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "spam");
+                    callback(err, res.id, res);
+                }
+            });
         }
     }
     // Make reaction menus work
@@ -352,7 +427,7 @@ module.exports = function(input) {
             menu.actions.filter(a => cf.slimMatch([availableFunctions.emojiToObject(a.emoji), event.d.emoji]) || a.emoji == event.d.emoji.name).forEach(function(action) { // Only matching emojis
                 switch (action.actionType) { // Do different things depending on the action type
                 case "reply": // Reply, mention the user in the same channel and give a message
-                    availableFunctions.sendMessage(event.d.channel_id, `<@${event.d.user_id}> ${action.actionData}`);
+                    availableFunctions.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
                     break;
                 case "edit": // Edit the message containing the menu reactions
                     bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
