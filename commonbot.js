@@ -140,7 +140,7 @@ module.exports = function(input) {
                         if (additional.embed) {
                             cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`); // Log information about what happened
                         } else {
-                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message}`, "spam");
+                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message} (${res.id})`, "spam");
                         }
                         callback(err, res.id, res);
                     }
