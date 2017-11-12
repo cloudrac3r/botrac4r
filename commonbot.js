@@ -128,7 +128,10 @@ module.exports = function(input) {
                                 availableFunctions.sendMessage(channelID, additional.characterLimit, callback, additional);
                             } else {
                                 availableFunctions.sendMessage(channelID, "Oops. I didn't manage to send a message because it exceeded Discord's character limit. This was probably your fault.", callback, additional);
+                                cf.log("Message exceeded character limit", "warning");
                             }
+                        } else if (err.response.message == "Missing Access") {
+                            cf.log("No permission to send messages in that channel", "warning");
                         } else { // Unknown error
                             cf.log(cf.stringify(err, true), "error");
                             callback(err);
@@ -411,9 +414,25 @@ module.exports = function(input) {
                         callback(err);
                     }
                 } else {
-                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers[serverID].name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "spam");
+                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers[serverID].name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "info");
                     callback(err, res.id, res);
                 }
+            });
+        },
+        // Delete a channel
+        deleteChannel(channelID, callback) {
+            if (!channelID) {
+                cf.log("Need a channelID to delete", "warning");
+                return;
+            }
+            if (!callback) callback = new Function();
+            bot.deleteChannel(channelID, function(err) {
+                if (err) {
+                    cf.log(cf.stringify(err, true), "error");
+                } else {
+                    cf.log("Deleted the channel "+channelID, "info");
+                }
+                callback(err);
             });
         }
     }
