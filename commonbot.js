@@ -122,7 +122,7 @@ module.exports = function(input) {
                             setTimeout(function() { // Try again after the timeout
                                 availableFunctions.sendMessage(channelID, message, callback, additional);
                             }, err.response.retry_after);
-                        } else if (err.response.content.match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
+                        } else if ((err.response.content || "").match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
                             if (additional.characterLimit) {
                                 delete additional.characterLimit; // Prevent the error message from hitting the character limit again
                                 availableFunctions.sendMessage(channelID, additional.characterLimit, callback, additional);
