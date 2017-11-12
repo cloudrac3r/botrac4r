@@ -1,7 +1,7 @@
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
     let sqlite = require("sqlite3");
-    let tzdb = new sqlite.Database("./timezone/timezone.db");
+    let tzdb = new sqlite.Database(__dirname+"/timezone.db");
     let availableFunctions = {
         timezone: {
             aliases: ["timezone", "time", "localtime", "tz"],
