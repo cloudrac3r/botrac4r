@@ -27,7 +27,7 @@ let modules = [ // Load these modules on startup and on change
 
 let token = require("./token.js"); // Bot token
 //let cf = require("./common.js"); // Now loaded via module
-let defaultPrefix = "."; // Bot prefixes and related, can be changed by user preferences
+let defaultPrefix = "v!"; // Bot prefixes and related, can be changed by user preferences
 let defaultSeperator = " ";
 let defaultAltSplit = ";";
 let defaultMentionPref = 1;
@@ -110,7 +110,7 @@ bot.once("allUsers", function() { // Once the bot connects
 bot.on("message", function(user, userID, channelID, message, event) {
     if (bot.users[userID].bot && userID != "238459957811478529") return; // Ignore all bots except for botrac3r //TODO: change
     let data = event.d;
-    db.get("SELECT prefix, seperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
+    db.get("SELECT prefix, seperator, altSeperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
         if (!dbr) {
             bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, seperator: defaultSeperator, altSeperator: defaultAltSplit};
@@ -122,7 +122,7 @@ bot.on("message", function(user, userID, channelID, message, event) {
             let mp = message.slice(prefix.length).split(seperator);
             for (let c in bc) { // Find a bot command whose alias matches
                 if (bc[c].aliases.includes(mp[0])) {
-                    bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), seperator, defaultAltSplit), data); // Call it
+                    bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data); // Call it
                 }
             }
         }

@@ -27,7 +27,8 @@ module.exports = function(input) {
             "person": "<:cbn_person:362387757592739850>",
             "cards": "<:cbn_cards:362384965989826561>",
             "info": "<:cbn_info:377710017627029505>",
-            "tick": "<:cbn_tick:378414422219161601>"
+            "tick": "<:cbn_tick:378414422219161601>",
+            "clock": "<:cbn_clock:381652491999117313>"
         },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {

@@ -49,6 +49,7 @@ module.exports = {
             else return JSON.stringify(input);
         }
         if (typeof(input) == "string") return input;
+        if (typeof(input) == "function") return "(Function)";
         return "unknown";
     },
     // Get a random number between two inputs. Includes maximum value.
@@ -56,10 +57,10 @@ module.exports = {
         return Math.floor(Math.random()*(max-min+1)+min);
     },
     // The better command argument function.
-    carg: function(input, split, altSplit) {
+    carg: function(input, prefix, split, altSplit, name) {
         if (!split) split = " ";
         if (!altSplit) altSplit = ";";
-        let output = {split: split, altSplit: altSplit};
+        let output = {prefix: prefix, split: split, altSplit: altSplit, name: name};
         output.input = input;
         output.words = input.split(split);
         output.regularWords = output.words.filter(i => !i.match(/^[+-][a-z]/i) && !i.match(/\w=[^\s]/));

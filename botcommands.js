@@ -80,10 +80,71 @@ module.exports = function(input) {
             }
         },
         setup: {
-            aliases: ["configure", "prefix"],
+            aliases: ["configure", "setup", "prefix"],
             shortHelp: "Configure your prefix and split preferences.",
             reference: "\`*prefix*\` \`*split*\` \`*AS\`",
             code: function(userID, channelID, command, d) {
+            }
+        },
+        flag: {
+            aliases: ["flag"],
+            shortHelp: "Create a representation of the US flag using emojis.",
+            reference: "blue=*blueEmoji* red=*redEmoji* white=*whiteEmoji* [*size*]",
+            longHelp: "Supply three different emojis along with their colours using command switches, and an optional size.",
+            code: function(userID, channelID, command, d) {
+                let error = [];
+                let colours = ["blue", "red", "white"];
+                let size = parseInt(command.numbers[0]) || 3;
+                let template = "";
+                colours.forEach(c => {
+                    if (!command.switches[c]) {
+                        error.push(c);
+                    }
+                });
+                if (error.length) {
+                    bf.sendMessage(channelID, "You did not specify "+cf.listify(error)+" in your command.", {mention: true});
+                    return;
+                }
+                switch (size) {
+                case 1:
+                    template =  "*-"+
+                                "--";
+                    break;
+                case 2:
+                    template =  " * ---\n"+
+                                "* *   \n"+
+                                " * ---\n"+
+                                "      \n"+
+                                "------";
+                    break;
+                case 3:
+                    template =  "* * -----\n"+
+                                " * *     \n"+
+                                "* * -----\n"+
+                                " * *     \n"+
+                                "---------\n"+
+                                "         \n"+
+                                "---------";
+                    break;
+                case 4:
+                    template =  " * * ------\n"+
+                                "* * *      \n"+
+                                " * * ------\n"+
+                                "* * *      \n"+
+                                "-----------\n"+
+                                "           \n"+
+                                "-----------\n"+
+                                "           \n"+
+                                "-----------";
+                    break;
+                }
+                let output = "Here is your flag. Fly it proudly. ✋😤\n"+template.replace(/\*/g, command.switches.blue).replace(/-/g, command.switches.red).replace(/ /g, command.switches.white);
+                bf.sendMessage(channelID, output, {mention: userID, characterLimit:
+                    "Unfortunately, that flag uses more than Discord's character limit of "+bf.messageCharacterLimit+" characters. Here's what you can do instead:\n"+
+                    "• Decrease the size of the flag\n"+
+                    "• Swap out some custom emojis in favour of regular emojis\n"+
+                    "• Stop shitposting"
+                });
             }
         }
     };
