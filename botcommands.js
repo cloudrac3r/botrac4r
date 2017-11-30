@@ -61,7 +61,7 @@ module.exports = function(input) {
         yesno: {
             aliases: ["yn", "yesno", "8ball"],
             shortHelp: "Answer a question with yes or no.",
-            reference: "[*question*] [[yes=]*percentage*] [no=*percentage]",
+            reference: "[*question*] [[yes=]*percentage*] [no=*percentage*]",
             longHelp: "Supply a number to change the % chance of picking yes (default 50).",
             code: function(userID, channelID, command, d) {
                 let words = [
@@ -86,16 +86,40 @@ module.exports = function(input) {
             longHelp: "A menu will appear allowing you to change settings.",
             code: function(userID, channelID, command, d) {
                 db.get("SELECT * FROM Users WHERE userID=?", [userID], (err,dbr) => {
-                    bf.reactionMenu(channelID, "What would you like to change?\n"+
+                    bf.reactionMenu(channelID, "**Settings menu**\n"+
                                                `${bf.buttons["1"]} Prefix (currently "${dbr.prefix}")\n`+
-                                               `${bf.buttons["2"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`, [
+                                               `${bf.buttons["2"]} Prefix plus space (currently **${(dbr.prefix.endsWith(" ") ? "using a space" : "not using a space")}**)\n`+
+                                               `${bf.buttons["3"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`, [
                         {emoji: bf.buttons["1"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             bf.messageMenu(channelID, "What would you like your new prefix to be?", userID, undefined, (message, event) => {
                                 db.run("UPDATE Users SET prefix=? WHERE userID=?", [message, userID], (err) => {
-                                    if (!err) bf.addReaction(channelID, event.d.id, "✅");
+                                    if (!err) {
+                                        bf.addReaction(channelID, event.d.id, "✅");
+                                        dbr.prefix = message;
+                                    }
                                 });
                             })}},
-                        {emoji: bf.buttons["2"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                        {emoji: bf.buttons["2"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
+                            if (!dbr.prefix.endsWith(" ")) {
+                                bf.sendMessage(channelID, "A space will be appended to your current prefix.", (err, id) => {
+                                    db.run("UPDATE Users SET prefix=? WHERE userID=?", [dbr.prefix+" ", userID], (err) => {
+                                        if (!err) {
+                                            bf.addReaction(channelID, id, "✅");
+                                            dbr.prefix += " ";
+                                        }
+                                    });
+                                });
+                            } else {
+                                bf.sendMessage(channelID, "Ending spaces will be removed from your current prefix.", (err, id) => {
+                                    db.run("UPDATE Users SET prefix=? WHERE userID=?", [dbr.prefix.replace(/ *$/, ""), userID], (err) => {
+                                        if (!err) {
+                                            bf.addReaction(channelID, id, "✅");
+                                            dbr.prefix = dbr.prefix.replace(/ *$/, "");
+                                        }
+                                    });
+                                });
+                            }}},
+                        {emoji: bf.buttons["3"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
                             let id;
                             function setMentionPref(pref) {
                                 db.run("UPDATE Users SET mention=? WHERE userID=?", [pref, userID], function(err, dbr) {
