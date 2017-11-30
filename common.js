@@ -139,5 +139,41 @@ module.exports = {
         }
         if (ampm) result += " "+(date.getUTCHours() < 12 ? "AM" : "PM");
         return result;
+    },
+    // Output a 2D array as an aligned table.
+    /* Input in the format
+     * ( [ ["Row 1", "Row 2", "Row 3"],
+     *     ["Answer 1", "Answer 2", "Answer 3"] ],
+     *   ["left", "right"] ) */
+    tableify: function(columns, align) {
+        for (let i = 0; i < columns.length; i++) { // Convert all entries to strings
+            for (let j = 0; j < columns[0].length; j++) {
+                columns[i][j] = columns[i][j].toString();
+            }
+        }
+        if (!align) align = []; // undefined align defaults to left
+        let output = []; // A place to put output
+        for (let c = 0; c < columns.length; c++) { // Loop over all columns
+            let temp = []; // A place to put one column
+            let length = 0; // Longest string so far
+            for (let i of columns[c]) if (i.length > length) length = i.length; // Fill in length
+            for (let i of columns[c]) { // Add input to temp
+                if (align[c] == "left") {
+                    temp.push(i.padEnd(length, " "));
+                } else {
+                    temp.push(i.padStart(length, " "));
+                }
+            }
+            output.push(temp); // Add temp to output
+        }
+        let outputString = ""; // What will be returned
+        for (let i = 0; i < output[0].length; i++) { // Loop over all rows
+            for (let j = 0; j < output.length; j++) { // Loop over row items
+                outputString += output[j][i]; // Append to outputString
+                if (j < output.length-1) outputString += "  "; // Space-pad columns
+            }
+            if (i < output[0].length-1) outputString += "\n"; // Seperate rows with a newline
+        }
+        return outputString;
     }
 }
