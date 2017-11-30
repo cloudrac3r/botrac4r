@@ -27,7 +27,7 @@ let modules = [ // Load these modules on startup and on change
 
 let token = require("./token.js"); // Bot token
 //let cf = require("./common.js"); // Now loaded via module
-let defaultPrefix = "v!"; // Bot prefixes and related, can be changed by user preferences
+let defaultPrefix = "."; // Bot prefixes and related, can be changed by user preferences
 let defaultSeperator = " ";
 let defaultAltSplit = ";";
 let defaultMentionPref = 1;
@@ -81,11 +81,11 @@ function loadModules(module) {
                 break;
             }
             if (bot.connected) {
-                bf.sendMessage("244613376360054794", "Loaded **"+m.filename+"**");
+                bf.sendMessage("160197704226439168", "Loaded **"+m.filename+"**");
             }
         } catch (e) {
             if (bot.connected) {
-                bf.sendMessage("244613376360054794", "Failed to load module **"+m.filename+"**: `"+e+"`");
+                bf.sendMessage("160197704226439168", "Failed to load module **"+m.filename+"**: `"+e+"`");
             }
             console.log("Failed to reload module "+m.filename+"\n"+e);
         }
@@ -103,12 +103,16 @@ bot.once("ready", function() {
     bot.getAllUsers();
 });
 
+bot.on("ready", function() {
+    bot.setPresence({game: {name: ".help", type: 0}});
+});
+
 bot.once("allUsers", function() { // Once the bot connects
     log(`Logged in as ${bot.username} (${bot.id})`, "info");
 });
 
 bot.on("message", function(user, userID, channelID, message, event) {
-    if (bot.users[userID].bot && userID != "238459957811478529") return; // Ignore all bots except for botrac3r //TODO: change
+    if (bot.users[userID].bot) return; // Ignore other bots
     let data = event.d;
     db.get("SELECT prefix, seperator, altSeperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
         if (!dbr) {
