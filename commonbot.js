@@ -1,6 +1,7 @@
 module.exports = function(input) {
     let {bot, cf, db} = input;
     let reactionMenus = {};
+    let messageMenus = [];
     let availableFunctions = {
         // Button reactions.
         buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
@@ -28,7 +29,9 @@ module.exports = function(input) {
             "cards": "<:cbn_cards:362384965989826561>",
             "info": "<:cbn_info:377710017627029505>",
             "tick": "<:cbn_tick:378414422219161601>",
-            "clock": "<:cbn_clock:381652491999117313>"
+            "clock": "<:cbn_clock:381652491999117313>",
+            "yes": "<:bn_yes:331164192864206848>",
+            "no": "<:bn_no:331164190284972034>"
         },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
@@ -389,6 +392,75 @@ module.exports = function(input) {
                 });
             });
         },
+        // Create a message menu
+        messageMenu: function(channelID, message, userID, pattern, action, callback) {
+            let isID = false;
+            if (!channelID) {
+                cf.log("Need a channelID to put a menu in", "warning");
+                return;
+            }
+            if (!message) {
+                cf.log("Need a message to send", "warning");
+                return;
+            }
+            if (!userID) {
+                cf.log("Need a userID to detect a response from", "warning");
+                return;
+            }
+            if (!pattern) pattern = /.*/;
+            if (!action) {
+                cf.log("Need an action to perform", "warning");
+                return;
+            }
+            if (!callback) callback = new Function();
+            new Promise(function(resolve, reject) {
+                if (message.match(/^[0-9]{16,}$/)) { // If message is actually a messageID
+                    bot.getMessage({channelID: channelID, messageID: messageID}, function(e,r) { // Make sure it's valid
+                        try { // If messageID is not valid,
+                            if (e.response.message == "Unknown Message") {
+                                resolve(); // continue
+                            }
+                        } catch (e) { // If messageID is valid
+                            isID = true;
+                            resolve();
+                        }
+                    });
+                } else { // If message is a message,
+                    resolve(); // continue
+                }
+            }).then(function() {
+                new Promise(function(resolve, reject) {
+                    if (isID) {
+                        resolve();
+                    } else if (bot.users[channelID]) {
+                        bot.createDMChannel(channelID, function(err, res) {
+                            if (err) callback(err);
+                            else {
+                                channelID = res.id;
+                                resolve();
+                            }
+                        });
+                    } else {
+                        resolve();
+                    }
+                }).then(function() {
+                    messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.userID == userID));
+                    if (!isID) {
+                        availableFunctions.sendMessage(channelID, message, function(err, messageID) {
+                            if (messageID) {
+                                messageMenus.push({channelID: channelID, userID: userID, pattern: pattern, action: action});
+                                callback(err, messageID);
+                            } else {
+                                callback(err);
+                            }
+                        });
+                    } else {
+                        messageMenus.push({channelID: channelID, userID: userID, pattern: pattern, action: action});
+                        callback(null, message);
+                    }
+                });
+            });
+        },
         // Create a channel
         createChannel(serverID, name, type, parentID, callback) {
             if (!serverID) {
@@ -445,6 +517,7 @@ module.exports = function(input) {
             let menu = reactionMenus[event.d.message_id]; // "menu" is faster to type
             //cf.log(event.d.emoji.name+" // "+menu.actions[0].emoji+" // "+event.d.emoji.name==menu.actions[0].emoji);
             menu.actions.filter(a => cf.slimMatch([availableFunctions.emojiToObject(a.emoji), event.d.emoji]) || a.emoji == event.d.emoji.name).forEach(function(action) { // Only matching emojis
+                if (action.allowedUsers && !action.allowedUsers.includes(event.d.user_id)) return; // Quit if the userID is not allowed
                 switch (action.actionType) { // Do different things depending on the action type
                 case "reply": // Reply, mention the user in the same channel and give a message
                     availableFunctions.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
@@ -493,6 +566,14 @@ module.exports = function(input) {
                     break;
                 }
             });
+        }
+    });
+    // Make message menus work
+    bot.on("message", function(user, userID, channelID, message, event) {
+        let menu = messageMenus.filter(m => m.channelID == channelID && m.userID == userID && message.match(m.pattern))[0];
+        if (menu) {
+            menu.action(message, event);
+            messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.userID == userID));
         }
     });
     return availableFunctions;
