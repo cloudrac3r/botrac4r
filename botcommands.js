@@ -114,12 +114,12 @@ module.exports = function(input) {
         flag: {
             aliases: ["flag"],
             shortHelp: "Create a representation of the US flag using emojis.",
-            reference: "blue=*blueEmoji* red=*redEmoji* white=*whiteEmoji* [*size*]",
+            reference: "blue=*blueEmoji* red=*redEmoji* white=*whiteEmoji* [[size=]*size*]",
             longHelp: "Supply three different emojis along with their colours using command switches, and an optional size.",
             code: function(userID, channelID, command, d) {
                 let error = [];
                 let colours = ["blue", "red", "white"];
-                let size = parseInt(command.numbers[0]) || 3;
+                let size = parseInt(command.numbers[0]) || parseInt(command.switches.size) || 3;
                 let template = "";
                 colours.forEach(c => {
                     if (!command.switches[c]) {
