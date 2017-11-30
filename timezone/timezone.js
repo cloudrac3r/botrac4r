@@ -29,7 +29,7 @@ module.exports = function(input) {
             aliases: ["settimezone", "settime", "settz", "stz", "setlocaltime", "slocaltime"],
             shortHelp: "Set your own local time zone.",
             reference: "[-]*hours*:*minutes*",
-            longHelp: "Set your time zone by naming its offset compared to UTC time in hours and minutes. For example, Pacific Time is `-20:00`, Eastern Time is `-17:00` and England is `0:00`.",
+            longHelp: "Set your time zone by naming its offset compared to UTC time in hours and minutes. For example, Pacific Time is `-8:00`, Eastern Time is `-5:00` and England is `0:00`.",
             code: function(userID, channelID, command, d) {
                 if (command.input.match(/^-?[0-9]{1,2}:[0-9]{2}$/)) {
                     tzdb.run("DELETE FROM Users WHERE userID = ?", userID, function() {
