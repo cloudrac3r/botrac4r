@@ -80,10 +80,35 @@ module.exports = function(input) {
             }
         },
         setup: {
-            aliases: ["configure", "setup", "prefix"],
+            aliases: ["configure", "setup", "prefix", "option", "options"],
             shortHelp: "Configure your prefix and split preferences.",
-            reference: "\`*prefix*\` \`*split*\` \`*AS\`",
+            reference: "",
+            longHelp: "A menu will appear allowing you to change settings.",
             code: function(userID, channelID, command, d) {
+                db.get("SELECT * FROM Users WHERE userID=?", [userID], (err,dbr) => {
+                    bf.reactionMenu(channelID, "What would you like to change?\n"+
+                                               `${bf.buttons["1"]} Prefix (currently "${dbr.prefix}")\n`+
+                                               `${bf.buttons["2"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`, [
+                        {emoji: bf.buttons["1"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
+                            bf.messageMenu(channelID, "What would you like your new prefix to be?", userID, undefined, (message, event) => {
+                                db.run("UPDATE Users SET prefix=? WHERE userID=?", [message, userID], (err) => {
+                                    if (!err) bf.addReaction(channelID, event.d.id, "✅");
+                                });
+                            })}},
+                        {emoji: bf.buttons["2"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                            let id;
+                            function setMentionPref(pref) {
+                                db.run("UPDATE Users SET mention=? WHERE userID=?", [pref, userID], function(err, dbr) {
+                                    if (!err) bf.addReaction(channelID, id, "✅");
+                                });
+                            }
+                            bf.reactionMenu(channelID, "Would you like to be mentioned at the start of command responses?", [
+                                {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(1)},
+                                {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(0)}
+                            ], (err,mid) => id = mid);
+                        }}
+                    ]);
+                });
             }
         },
         flag: {
