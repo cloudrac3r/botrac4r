@@ -112,7 +112,7 @@ bot.on("message", function(user, userID, channelID, message, event) {
     let data = event.d;
     db.get("SELECT prefix, seperator, altSeperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
         if (!dbr) {
-            bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
+            //bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, seperator: defaultSeperator, altSeperator: defaultAltSplit};
             db.run("INSERT INTO Users VALUES (?, ?, ?, ?, ?)", [userID, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
         }
@@ -124,6 +124,13 @@ bot.on("message", function(user, userID, channelID, message, event) {
                 if (bc[c].aliases.includes(mp[0])) {
                     bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data); // Call it
                 }
+            }
+            if (mp[0] == "help") { // Exclusive help command because reasons
+                bf.sendMessage(channelID, "DM sent.");
+                bf.sendMessage(userID, "Try **"+prefix+"help *command name*** for more details.```\n"+cf.tableify([
+                    Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
+                    Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
+                ], ["left", "left"])+"```");
             }
         }
     });
