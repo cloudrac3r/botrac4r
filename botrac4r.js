@@ -126,11 +126,26 @@ bot.on("message", function(user, userID, channelID, message, event) {
                 }
             }
             if (mp[0] == "help") { // Exclusive help command because reasons
-                bf.sendMessage(channelID, "DM sent.");
-                bf.sendMessage(userID, "Try **"+prefix+"help *command name*** for more details.```\n"+cf.tableify([
-                    Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
-                    Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
-                ], ["left", "left"])+"```");
+                let target;
+                if (mp[1]) target = Object.keys(bc).map(c => bc[c]).filter(c => c.aliases.includes(mp[1]))[0];
+                if (target) {
+                    bf.sendMessage(channelID, `**${target.shortHelp}**\n`+
+                                              `**Aliases**: ${target.aliases.join(", ")}\n`+
+                                              `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
+                                              (target.longHelp ? "\n\n"+target.longHelp : ""));
+                } else {
+                    if (!bot.directMessages[channelID]) bf.sendMessage(channelID, "DM sent.");
+                    bf.sendMessage(userID, bot.username+" uses things called *flags* and *switches*. "+
+                                           "These are to make it easier for you to specify options in your command without having to remember which order the options must be given in.\n"+
+                                           "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a feature.\n"+
+                                           "Switches are used by prefixing a word with another word connected with an equals sign, e.g. `size=4`. This allows you to specify that option anywhere in the command.\n"+
+                                           "If you don't want to use flags or switches, you can usually use positional arguments instead.", function() {
+                        bf.sendMessage(userID, "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
+                            Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
+                            Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
+                        ], ["left", "left"])+"```");
+                    });
+                }
             }
         }
     });
