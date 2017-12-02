@@ -22,6 +22,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: "./timezone/timezone.js",
         dest: "bot commands"
+    },{
+        filename: "./garfield.js",
+        dest: "bot commands"
     }
 ];
 
