@@ -18,7 +18,7 @@ module.exports = function(input) {
                     }
                 }
                 if (command.switches.year && command.switches.month && command.switches.date) {
-                    let date = new Date(command.switches.year+"-"+command.switches.month+"-"+command.switches.day+" 12:00 AM +0:00");
+                    let date = new Date(command.switches.year+"-"+command.switches.month+"-"+command.switches.date+" 12:00 AM +0:00");
                     if (date.toUTCString() == "Invalid Date") {
                         bf.sendMessage(channelID, "That's not a valid date.", {mention: userID});
                     } else {
