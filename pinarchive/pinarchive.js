@@ -3,10 +3,10 @@ module.exports = function(input) {
     let sqlite = require("sqlite3");
     let pindb = new sqlite.Database("./pinarchive/pinarchive.db");
     bot.on("message", function(user, userID, channelID, message, event) {
-        if (message == "test pin" || event.d.type == 6) { //TODO: remove trigger message
+        if (event.d.type == 6) {
             cf.log("Pin detected", "info");
             let target;
-            pindb.get("SELECT channelID FROM Servers WHERE serverID = ?", bot.channels[channelID].guild_id, function(err, dbr) {
+            pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channels[channelID].guild_id, function(err, dbr) {
                 if (dbr) { // Server is in list of allowed servers
                     pindb.get("SELECT * FROM Channels WHERE origin = ?", channelID, function(err, cdbr) {
                         if (!cdbr) { // No channel overrides
@@ -28,6 +28,8 @@ module.exports = function(input) {
                                     bf.sendMessage(target, "", function(e) {
                                         if (e) {
                                             cf.log(e, "error");
+                                        } else {
+                                            bf.sendMessage(channelID, "OK! That pin has been sent to <#"+target+">.", {mention: userID});
                                         }
                                     }, {embed: {
                                         author: {
@@ -45,6 +47,12 @@ module.exports = function(input) {
                                         timestamp: new Date(r.timestamp).toJSON()
                                     }});
                                 });
+                                if (dbr.maxPins) {
+                                    if (a.length > dbr.maxPins) {
+                                        bf.sendMessage(channelID, "To make space for more pins, I unpinned the oldest pinned message in this channel.");
+                                        bot.deletePinnedMessage({channelID: channelID, messageID: a[a.length-1].id});
+                                    }
+                                }
                             });
                         }
                     });
