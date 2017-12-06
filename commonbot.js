@@ -33,6 +33,46 @@ module.exports = function(input) {
             "yes": "<:bn_yes:331164192864206848>",
             "no": "<:bn_no:331164190284972034>"
         },
+        useremojis: {
+            "112767329347104768": "00",
+            "114849691241283591": "01",
+            "112890272819507200": "02",
+            "235876818656296960": "03",
+            "113852329832218627": "04",
+            "134826546694193153": "05",
+            "113442380811649024": "06",
+            "103846931398148096": "07",
+            "113457314106740736": "08",
+            "112816036671184896": "09",
+            "117749297562255364": "10",
+            "97566343791927296": "11",
+            "176580265294954507": "12",
+            "309960863526289408": "13",
+            "113340068197859328": "14",
+            "208304366719860737": "15",
+            "248169612980518912": "16",
+            "112760500130975744": "17",
+            "270264131523837952": "18",
+            "115273199461203968": "19",
+            "123171411358515200": "20",
+            "104867073343127552": "21",
+            "114557048678514693": "22",
+            "111604486476181504": "23",
+            "238459957811478529": "24",
+            "117661708092309509": "25",
+            "112764060835012608": "26",
+            "112762265362513920": "27",
+            "114147806469554185": "28",
+            "116718249567059974": "29",
+            "112814914019614720": "30",
+            "114412498307776512": "31",
+            "112770767745265664": "32",
+            "113671556835573768": "33",
+            "277449474476081153": "34",
+            "100735237184561152": "35",
+            "353176789318762499": "36",
+            "139941520324296704": "37",
+        },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
             if (!prefer) prefer = "";
@@ -126,7 +166,7 @@ module.exports = function(input) {
                             setTimeout(function() { // Try again after the timeout
                                 availableFunctions.sendMessage(channelID, message, callback, additional);
                             }, err.response.retry_after);
-                        } else if ((err.response.content || "").match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
+                        } else if (err.response && typeof(err.response.content) == "string" && err.response.content.match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
                             if (additional.characterLimit) {
                                 delete additional.characterLimit; // Prevent the error message from hitting the character limit again
                                 availableFunctions.sendMessage(channelID, additional.characterLimit, callback, additional);
