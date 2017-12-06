@@ -192,7 +192,8 @@ module.exports = function(input) {
             });
         },
         // Edit a message sent by the bot.
-        editMessage: function(channelID, messageID, message, callback) {
+        editMessage: function(channelID, messageID, message, callback, additional) {
+            if (!additional) additional = {};
             if (!channelID) {
                 cf.log("Need a channelID to edit a message in", "warning");
                 return;
@@ -201,12 +202,12 @@ module.exports = function(input) {
                 cf.log("Need a messageID to edit", "warning");
                 return;
             }
-            if (!message) {
+            if (!message && !additional.embed) {
                 cf.log("Need a message to edit to", "warning");
                 return;
             }
             if (!callback) callback = new Function();
-            bot.editMessage({channelID: channelID, messageID: messageID, message: message}, function(err, res) {
+            bot.editMessage(Object.assign({channelID: channelID, messageID: messageID, message: message}, additional), function(err, res) {
                 if (err) {
                     if (err.statusCode == 50005) { // Sent by another user
                         cf.log("Message was sent by another user and cannot be edited", "info");
