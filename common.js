@@ -92,6 +92,10 @@ module.exports = {
             return array[0]+", "+module.exports.listify(array.slice(1)); // For arrays with more than 2 items, recurse.
         }
     },
+    // Map a value from a range to a different range
+    map: function(value, inMin, inMax, outMin, outMax) {
+        return (value-inMin) * (outMax-outMin) / (inMax-inMin) + outMin;
+    },
     // Trim leading and trailing spaces (or another character) from a string.
     trim: function(string, remove) {
         if (!remove) remove = " ";
