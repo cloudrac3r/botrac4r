@@ -19,6 +19,7 @@ module.exports = function(input) {
             // Punctuation
             "question": "<:bn_qu:331164190267932672>",
             // Operators
+            "plus": "<:bn_pl:328041457695064064>",
             "times": "<:bn_ti:327986149203116032>",
             "plusminus": "<:bn_pm:327986149022760960>",
             // Arrows
@@ -33,7 +34,7 @@ module.exports = function(input) {
             "yes": "<:bn_yes:331164192864206848>",
             "no": "<:bn_no:331164190284972034>"
         },
-        useremojis: {
+        userEmojis: {
             "112767329347104768": "00",
             "114849691241283591": "01",
             "112890272819507200": "02",
@@ -93,6 +94,17 @@ module.exports = function(input) {
         userIDToColour: function(userID, serverID) {
             let role = bot.servers[serverID].members[userID].roles.map(r => bot.servers[serverID].roles[r]).sort((a,b) => b.position-a.position).filter(r => r.color != 0)[0];
             return role ? role.color : 0x808080;
+        },
+        // Given a userID, return the custom emoji representing the user
+        userIDToEmoji: function(userID, notFound) {
+            if (!notFound) notFound = "";
+            let emojiServer = bot.servers["367399615621758976"];
+            let emojiName = availableFunctions.userEmojis[userID];
+            if (!emojiName || !emojiServer || !emojiServer.emojis) {
+                return notFound;
+            } else {
+                return "<:"+emojiName+":"+Object.keys(emojiServer.emojis).find(e => emojiServer.emojis[e].name == emojiName)+">";
+            }
         },
         // Given a userID or channelID, return its display name.
         nameOfChannel: function(channelID) {
@@ -384,7 +396,7 @@ module.exports = function(input) {
             if (!callback) callback = new Function();
             new Promise(function(resolve, reject) {
                 if (message.match(/^[0-9]{16,}$/)) { // If message is actually a messageID
-                    bot.getMessage({channelID: channelID, messageID: messageID}, function(e,r) { // Make sure it's valid
+                    bot.getMessage({channelID: channelID, messageID: message}, function(e,r) { // Make sure it's valid
                         try { // If messageID is not valid,
                             if (e.response.message == "Unknown Message") {
                                 resolve(); // continue
@@ -426,7 +438,7 @@ module.exports = function(input) {
                         });
                     } else {
                         availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
-                            callback(err, message);
+                            callback(null, message);
                         });
                         reactionMenus[message] = {actions: actions, channelID: channelID};
                     }
@@ -455,34 +467,34 @@ module.exports = function(input) {
             }
             if (!callback) callback = new Function();
             new Promise(function(resolve, reject) {
-                if (message.match(/^[0-9]{16,}$/)) { // If message is actually a messageID
-                    bot.getMessage({channelID: channelID, messageID: messageID}, function(e,r) { // Make sure it's valid
-                        try { // If messageID is not valid,
-                            if (e.response.message == "Unknown Message") {
-                                resolve(); // continue
-                            }
-                        } catch (e) { // If messageID is valid
-                            isID = true;
+                if (isID) {
+                    resolve();
+                } else if (bot.users[channelID]) {
+                    bot.createDMChannel(channelID, function(err, res) {
+                        if (err) callback(err);
+                        else {
+                            channelID = res.id;
                             resolve();
                         }
                     });
-                } else { // If message is a message,
-                    resolve(); // continue
+                } else {
+                    resolve();
                 }
             }).then(function() {
                 new Promise(function(resolve, reject) {
-                    if (isID) {
-                        resolve();
-                    } else if (bot.users[channelID]) {
-                        bot.createDMChannel(channelID, function(err, res) {
-                            if (err) callback(err);
-                            else {
-                                channelID = res.id;
+                    if (message.match(/^[0-9]{16,}$/)) { // If message is actually a messageID
+                        bot.getMessage({channelID: channelID, messageID: message}, function(e,r) { // Make sure it's valid
+                            try { // If messageID is not valid,
+                                if (e.response.message == "Unknown Message") {
+                                    resolve(); // continue
+                                }
+                            } catch (e) { // If messageID is valid
+                                isID = true;
                                 resolve();
                             }
                         });
-                    } else {
-                        resolve();
+                    } else { // If message is a message,
+                        resolve(); // continue
                     }
                 }).then(function() {
                     messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.userID == userID));
