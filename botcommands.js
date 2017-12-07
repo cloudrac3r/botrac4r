@@ -195,6 +195,15 @@ module.exports = function(input) {
                     "• Stop shitposting"
                 });
             }
+        },
+        "invite": {
+            aliases: ["invite"],
+            shortHelp: "Add "+bot.username+" to a server",
+            reference: "",
+            longHelp: "",
+            code: function(userID, channelID, command, d) {
+                bf.sendMessage(channelID, "You can use this link to add "+bot.username+" to any server: <https://discordapp.com/oauth2/authorize?client_id=353703396483661824&scope=bot>\nTo work properly, it will need additional permissions. Giving it Administrator will give it all the permissions it needs.");
+            }
         }
     };
     return availableFunctions;
