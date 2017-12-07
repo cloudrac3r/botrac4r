@@ -3,32 +3,37 @@
 /// === REQUIRES, CONSTANTS AND GLOBALS ===
 
 let cf = {}; let bf = {}; let bc = {}; // Common Functions, Bot Framework and Bot Commands
+const events = require("events");
+let reloadEvent = new events.EventEmitter();
 let modules = [ // Load these modules on startup and on change
     {
-        filename: "./common.js",
+        filename: __dirname+"/common.js",
         dest: "common"
     },{
-        filename: "./commonbot.js",
+        filename: __dirname+"/commonbot.js",
         dest: "bot framework"
     },{
-        filename: "./botcommands.js",
+        filename: __dirname+"/botcommands.js",
         dest: "bot commands"
     },{
-        filename: "./onuw.js",
+        filename: __dirname+"/onuw.js",
         dest: "bot commands"
     },{
-        filename: "./pinarchive/pinarchive.js",
+        filename: __dirname+"/pinarchive/pinarchive.js",
         dest: "bot commands"
     },{
-        filename: "./timezone/timezone.js",
+        filename: __dirname+"/timezone/timezone.js",
         dest: "bot commands"
     },{
-        filename: "./garfield.js",
+        filename: __dirname+"/garfield.js",
+        dest: "bot commands"
+    },{
+        filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
     }
 ];
 
-let token = require("./token.js"); // Bot token
+let token = require(__dirname+"/token.js"); // Bot token
 //let cf = require("./common.js"); // Now loaded via module
 let defaultPrefix = "."; // Bot prefixes and related, can be changed by user preferences
 let defaultSeperator = " ";
@@ -40,7 +45,7 @@ let Discord = require("discord.io-gateway_v6"); // Switch to a fork of discord.i
 let fs = require("fs");
 let request = require("request");
 let sqlite = require("sqlite3");
-let db = new sqlite.Database("./botrac4r.db");
+let db = new sqlite.Database(__dirname+"/botrac4r.db");
 
 let bot = new Discord.Client({ // Log in bot
     token: token,
@@ -69,28 +74,38 @@ function loadModules(module) {
     let mods = modules; // List of modules, defaults to global variable modules, overridden by function parameter
     if (module) mods = [module];
     mods.forEach(m => {
-        console.log("Loading module "+m.filename);
+        if (cf.log) {
+            cf.log("Loading module "+m.filename, "info");
+        } else {
+            console.log("Loading module "+m.filename);
+        }
         try {
+            reloadEvent.emit(m.filename);
             delete require.cache[require.resolve(m.filename)]; // Otherwise it loads from the cache and ignores file changes
             switch (m.dest) { // Do different things depending on its purpose
             case "common":
                 Object.assign(cf, require(m.filename)); // Load it into common functions
                 break;
             case "bot framework":
-                Object.assign(bf, require(m.filename)({bot: bot, cf: cf, db: db})); // Load it into bot framework
+                Object.assign(bf, require(m.filename)({bot: bot, cf: cf, db: db, reloadEvent: reloadEvent})); // Load it into bot framework
                 break;
             case "bot commands":
-                Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db})); // Load it as bot commands
+                Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db, reloadEvent: reloadEvent})); // Load it as bot commands
                 break;
             }
             if (bot.connected) {
-                bf.sendMessage("160197704226439168", "Loaded **"+m.filename+"**");
+                // It's starting to get annoying.
+                //bf.sendMessage("160197704226439168", "Loaded **"+m.filename+"**");
             }
         } catch (e) {
             if (bot.connected) {
-                bf.sendMessage("160197704226439168", "Failed to load module **"+m.filename+"**: `"+e+"`");
+                // It's starting to get annoying.
+                //bf.sendMessage("160197704226439168", "Failed to load module **"+m.filename+"**: `"+e+"`");
+            } else if (cf.log) {
+                cf.log("Failed to reload module "+m.filename+"\n"+e, "error");
+            } else {
+                console.log("Failed to reload module "+m.filename+"\n"+e);
             }
-            console.log("Failed to reload module "+m.filename+"\n"+e);
         }
         if (!m.watched) { // If file isn't already being watched,
             m.watched = true;
@@ -115,6 +130,7 @@ bot.once("allUsers", function() { // Once the bot connects
 });
 
 bot.on("message", function(user, userID, channelID, message, event) {
+    if (!bot.users[userID]) return; // Ignore "fake users"
     if (bot.users[userID].bot) return; // Ignore other bots
     let data = event.d;
     db.get("SELECT prefix, seperator, altSeperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
@@ -158,7 +174,7 @@ bot.on("message", function(user, userID, channelID, message, event) {
     });
 });
 
-bot.on("disconnect", function() {
-    log("Disconnected from Discord, will reconnect automatically.", "info");
+bot.on("disconnect", function(code) {
+    log("Disconnected from Discord ("+code+"), will reconnect automatically.", "info");
     bot.connect();
 });
