@@ -122,7 +122,7 @@ bot.once("ready", function() {
 });
 
 bot.on("ready", function() {
-    bot.setPresence({game: {name: ".help", type: 0}});
+    bot.setPresence({game: {name: defaultPrefix + "help", type: 0}});
 });
 
 bot.once("allUsers", function() { // Once the bot connects
