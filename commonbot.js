@@ -25,6 +25,7 @@ module.exports = function(input) {
             // Arrows
             "right": "<:bn_fo:328724374465282049>",
             "redo": "<:bn_re:362741439211503616>",
+            "point down": "<:cbn_ptd:389238901233025034>",
             // Other symbols
             "person": "<:cbn_person:362387757592739850>",
             "cards": "<:cbn_cards:362384965989826561>",
@@ -32,7 +33,8 @@ module.exports = function(input) {
             "tick": "<:cbn_tick:378414422219161601>",
             "clock": "<:cbn_clock:381652491999117313>",
             "yes": "<:bn_yes:331164192864206848>",
-            "no": "<:bn_no:331164190284972034>"
+            "no": "<:bn_no:331164190284972034>",
+            "blank": "<:bn_bl:330501355737448450>"
         },
         userEmojis: {
             "112767329347104768": "00",
@@ -194,7 +196,7 @@ module.exports = function(input) {
                         }
                     } else { // Success
                         if (additional.embed) {
-                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`); // Log information about what happened
+                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`, "spam"); // Log information about what happened
                         } else {
                             cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message} (${res.id})`, "spam");
                         }

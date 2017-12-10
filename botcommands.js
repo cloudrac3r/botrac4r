@@ -204,6 +204,24 @@ module.exports = function(input) {
             code: function(userID, channelID, command, d) {
                 bf.sendMessage(channelID, "You can use this link to add "+bot.username+" to any server: <https://discordapp.com/oauth2/authorize?client_id=353703396483661824&scope=bot>\nTo work properly, it will need additional permissions. Giving it Administrator will give it all the permissions it needs.");
             }
+        },
+        "vote": {
+            aliases: ["vote", "poll"],
+            shortHelp: "Ask people to vote on something",
+            reference: "[*question*]",
+            longHelp: "Reactions will be added to your message allowing people to choose the option that they like the most.\nPut a number in your message and that number will be available as a reaction, in order to allow people to choose from a set of options.",
+            code: function(userID, channelID, command, d) {
+                let reactions = [bf.buttons["yes"], bf.buttons["no"], bf.buttons["point down"]];
+                for (let i = 1; i <= 16; i++) {
+                    cf.log(i);
+                    if (command.input.match(new RegExp("(^|\\D)"+i+"($|\\D)"))) {
+                        cf.log(bf.buttons[i.toString()]);
+                        reactions.push(bf.buttons[i.toString()]);
+                    } else cf.log("no match");
+                }
+                cf.log(reactions);
+                bf.addReactions(channelID, d.id, reactions);
+            }
         }
     };
     return availableFunctions;
