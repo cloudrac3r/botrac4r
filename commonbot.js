@@ -16,6 +16,8 @@ module.exports = function(input) {
             "7": "<:bn_7:327896458067968002>",
             "8": "<:bn_8:327896459070537728>",
             "9": "<:bn_9:327896459292704769>",
+            // Words
+            "end": "<:bn_en:327896461272678400>",
             // Punctuation
             "question": "<:bn_qu:331164190267932672>",
             // Operators
@@ -404,7 +406,7 @@ module.exports = function(input) {
                                 resolve(); // continue
                             }
                         } catch (e) { // If messageID is valid
-                            isID = true;
+                            isID = r;
                             resolve();
                         }
                     });
@@ -439,10 +441,21 @@ module.exports = function(input) {
                             }
                         });
                     } else {
-                        availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
-                            callback(null, message);
-                        });
                         reactionMenus[message] = {actions: actions, channelID: channelID};
+                        actions = actions.filter(action => {
+                            let match = isID.reactions.map(r => r.emoji).find(r => {
+                                let t1 = availableFunctions.emojiToObject(r);
+                                let t2 = availableFunctions.emojiToObject(action.emoji);
+                                if (t1 == t2 || (t1.id && t2.id && t1.id == t2.id)) return true;
+                            });
+                            if (match) return false;
+                            else return true;
+                        });
+                        if (actions.length) {
+                            availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
+                                callback(null, message);
+                            });
+                        }
                     }
                 });
             });
@@ -572,17 +585,34 @@ module.exports = function(input) {
             let menu = reactionMenus[event.d.message_id]; // "menu" is faster to type
             //cf.log(event.d.emoji.name+" // "+menu.actions[0].emoji+" // "+event.d.emoji.name==menu.actions[0].emoji);
             menu.actions.filter(a => cf.slimMatch([availableFunctions.emojiToObject(a.emoji), event.d.emoji]) || a.emoji == event.d.emoji.name).forEach(function(action) { // Only matching emojis
-                if (action.allowedUsers && !action.allowedUsers.includes(event.d.user_id)) return; // Quit if the userID is not allowed
-                switch (action.actionType) { // Do different things depending on the action type
-                case "reply": // Reply, mention the user in the same channel and give a message
-                    availableFunctions.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
-                    break;
-                case "edit": // Edit the message containing the menu reactions
-                    bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
-                    break;
-                case "js": // Run JS code
-                    action.actionData(event, reactionMenus);
-                    break;
+                if (!action.allowedUsers || action.allowedUsers.includes(event.d.user_id)) { // Only take action if the userID is allowed
+                    switch (action.actionType) { // Do different things depending on the action type
+                    case "reply": // Reply, mention the user in the same channel and give a message
+                        availableFunctions.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
+                        break;
+                    case "edit": // Edit the message containing the menu reactions
+                        bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
+                        break;
+                    case "js": // Run JS code
+                        action.actionData(event, reactionMenus);
+                        break;
+                    }
+                    switch (action.ignore) { // Sometimes ignore repeat actions
+                    case "that": // Disable actions for that emoji
+                        menu.actions = menu.actions.map(a => {
+                            if (cf.slimMatch([availableFunctions.emojiToObject(a.emoji), availableFunctions.emojiToObject(action.emoji)])) {
+                                Object.assign(a, {actionType: "none"});
+                            }
+                            return a;
+                        });
+                        break;
+                    case "all": // Disable actions for all emojis
+                        menu.actions.map(a => Object.assign(a, {actionType: "none"}));
+                        break;
+                    case "total": // Stop treating the message as a menu
+                        delete reactionMenus[event.d.message_id];
+                        break;
+                    }
                 }
                 switch (action.remove) { // Sometimes remove certain emojis after being clicked
                 case "user": // Remove the user's reaction only
@@ -602,22 +632,6 @@ module.exports = function(input) {
                     break;
                 case "message": // Delete the message containing the menu reactions
                     bot.deleteMessage({channelID: event.d.channel_id, messageID: event.d.message_id});
-                    break;
-                }
-                switch (action.ignore) { // Sometimes ignore repeat actions
-                case "that": // Disable actions for that emoji
-                    menu.actions = menu.actions.map(a => {
-                        if (cf.slimMatch([availableFunctions.emojiToObject(a.emoji), availableFunctions.emojiToObject(action.emoji)])) {
-                            Object.assign(a, {actionType: "none"});
-                        }
-                        return a;
-                    });
-                    break;
-                case "all": // Disable actions for all emojis
-                    menu.actions.map(a => Object.assign(a, {actionType: "none"}));
-                    break;
-                case "total": // Stop treating the message as a menu
-                    delete reactionMenus[event.d.message_id];
                     break;
                 }
             });
