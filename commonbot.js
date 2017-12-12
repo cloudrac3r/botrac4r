@@ -442,15 +442,17 @@ module.exports = function(input) {
                         });
                     } else {
                         reactionMenus[message] = {actions: actions, channelID: channelID};
-                        actions = actions.filter(action => {
-                            let match = isID.reactions.map(r => r.emoji).find(r => {
-                                let t1 = availableFunctions.emojiToObject(r);
-                                let t2 = availableFunctions.emojiToObject(action.emoji);
-                                if (t1 == t2 || (t1.id && t2.id && t1.id == t2.id)) return true;
+                        if (isID.reactions) {
+                            actions = actions.filter(action => {
+                                let match = isID.reactions.map(r => r.emoji).find(r => {
+                                    let t1 = availableFunctions.emojiToObject(r);
+                                    let t2 = availableFunctions.emojiToObject(action.emoji);
+                                    if (t1 == t2 || (t1.id && t2.id && t1.id == t2.id)) return true;
+                                });
+                                if (match) return false;
+                                else return true;
                             });
-                            if (match) return false;
-                            else return true;
-                        });
+                        }
                         if (actions.length) {
                             availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
                                 callback(null, message);
