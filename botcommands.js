@@ -7,12 +7,15 @@ module.exports = function(input) {
             reference: "[[min=]*minimumNumber*] [[max=]*maximumNumber*] [message]",
             longHelp: "The first number in the message (or the min= switch) is the lowest number that can be picked, defaulting to 1. The second number in the message (or the max= switch) is the highest number that can be picked. Any other text in the message will be used as the description of the roll.",
             code: function(userID, channelID, command, d) { // Lowest and highest possible rolls
-                let min = isNaN(parseInt(command.switches.min)) ?
-                    (isNaN(parseInt(command.numbers[0])) ? 1 : parseInt(command.numbers[0]))
-                  : (parseInt(command.switches.min));
-                let max = isNaN(parseInt(command.switches.max)) ?
-                    (isNaN(parseInt(command.numbers[1])) ? 100 : parseInt(command.numbers[1]))
-                  : (parseInt(command.switches.max));
+                let min;
+                if (command.switches.min) min = parseInt(command.switches.min);
+                else if (command.numbers.length >= 2) min = parseInt(command.numbers[0]);
+                else min = 1;
+                let max;
+                if (command.switches.max) max = parseInt(command.switches.max);
+                else if (command.numbers.length == 1) max = parseInt(command.numbers[0]);
+                else if (command.numbers.length >= 2) max = parseInt(command.numbers[1]);
+                else max = 100;
                 if (min > max) { // Swap order if min was actually the larger number
                     let t = min; min = max; max = t;
                 }
@@ -73,10 +76,10 @@ module.exports = function(input) {
                  || (parseFloat(command.numbers[0]) >= 0 && parseFloat(command.numbers[0]) <= 100 ? parseFloat(command.numbers[0])+"" : false)
                  || 50);
                 cf.log(yesChance, "error");
-                let question = (command.nonNumbers[0] ? command.nonNumbers.join(command.split) : "do something");
+                let question = (command.nonNumbers[0] ? command.nonNumbers.join(command.split) : "Deciding if you should do something");
                 let yn = (Math.random()*100 < yesChance ? 0 : 1);
                 let response = cf.rarray(words[yn]);
-                bf.sendMessage(channelID, `Deciding if you should ${question}: **${response}** *(luck: ${yesChance}%)*`, {mention: userID});
+                bf.sendMessage(channelID, `​${question}: **${response}** *(luck: ${yesChance}%)*`, {mention: userID}); //SC: U+200B zero-width space
             }
         },
         setup: {
@@ -87,18 +90,36 @@ module.exports = function(input) {
             code: function(userID, channelID, command, d) {
                 db.get("SELECT * FROM Users WHERE userID=?", [userID], (err,dbr) => {
                     bf.reactionMenu(channelID, "**Settings menu**\n"+
-                                               `${bf.buttons["1"]} Prefix (currently "${dbr.prefix}")\n`+
+                                               `${bf.buttons["1"]} Prefix (currently \`${dbr.prefix.replace(/`/g, "ˋ")}\`)\n`+ //SC: IPA modifier grave U+02CB
                                                `${bf.buttons["2"]} Prefix plus space (currently **${(dbr.prefix.endsWith(" ") ? "using a space" : "not using a space")}**)\n`+
-                                               `${bf.buttons["3"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`, [
+                                               `${bf.buttons["3"]} Regex prefix (currently a **${(dbr.isRegex ? "regex" : "string")}**)\n`+
+                                               `${bf.buttons["4"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`+
+                                               `${bf.buttons["5"]} HookTube links (currently **${(dbr.hooktube ? "on" : "off")}**)`, [
                         {emoji: bf.buttons["1"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             bf.messageMenu(channelID, "What would you like your new prefix to be?", userID, undefined, (message, event) => {
-                                db.run("UPDATE Users SET prefix=? WHERE userID=?", [message, userID], (err) => {
-                                    if (!err) {
-                                        bf.addReaction(channelID, event.d.id, "✅");
-                                        dbr.prefix = message;
+                                new Promise((resolve, reject) => {
+                                    if (dbr.isRegex) {
+                                        try {
+                                            new RegExp(message);
+                                            resolve();
+                                        } catch (e) {
+                                            bf.sendMessage(channelID, "Your prefix is set as a regular expression, but what you typed is not valid.");
+                                        }
+                                    } else {
+                                        resolve();
                                     }
+                                }).then(() => {
+                                    db.run("UPDATE Users SET prefix=? WHERE userID=?", [message, userID], (err) => {
+                                        if (!err) {
+                                            bf.addReaction(channelID, event.d.id, "✅");
+                                            dbr.prefix = message;
+                                        } else {
+                                            bf.addReaction(channelID, id, "❎");
+                                        }
+                                    });
                                 });
-                            })}},
+                            });
+                        }},
                         {emoji: bf.buttons["2"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             if (!dbr.prefix.endsWith(" ")) {
                                 bf.sendMessage(channelID, "A space will be appended to your current prefix.", (err, id) => {
@@ -106,6 +127,8 @@ module.exports = function(input) {
                                         if (!err) {
                                             bf.addReaction(channelID, id, "✅");
                                             dbr.prefix += " ";
+                                        } else {
+                                            bf.addReaction(channelID, id, "❎");
                                         }
                                     });
                                 });
@@ -115,20 +138,59 @@ module.exports = function(input) {
                                         if (!err) {
                                             bf.addReaction(channelID, id, "✅");
                                             dbr.prefix = dbr.prefix.replace(/ *$/, "");
+                                        } else {
+                                            bf.addReaction(channelID, id, "❎");
                                         }
                                     });
                                 });
-                            }}},
+                            }
+                        }},
                         {emoji: bf.buttons["3"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                            let id;
+                            function setRegexPref(value) {
+                                db.run("UPDATE Users SET isRegex=? WHERE userID=?", [value, userID], (err) => {
+                                    if (!err) {
+                                        bf.addReaction(channelID, id, "✅");
+                                        dbr.isRegex = value;
+                                    } else {
+                                        bf.addReaction(channelID, id, "❎");
+                                    }
+                                });
+                            }
+                            try {
+                                new RegExp(dbr.prefix);
+                                bf.reactionMenu(channelID, "Would you like your prefix to be a regular expression instead of a string?", [
+                                    {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setRegexPref(1)},
+                                    {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setRegexPref(0)}
+                                ], (err,mid) => id = mid);
+                            } catch (e) {
+                                bf.sendMessage(channelID, "Your current prefix is not a valid regular expression and so this option cannot be set.");
+                            }
+                        }},
+                        {emoji: bf.buttons["4"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
                             let id;
                             function setMentionPref(pref) {
                                 db.run("UPDATE Users SET mention=? WHERE userID=?", [pref, userID], function(err, dbr) {
                                     if (!err) bf.addReaction(channelID, id, "✅");
+                                    else bf.addReaction(channelID, id, "❎");
                                 });
                             }
                             bf.reactionMenu(channelID, "Would you like to be mentioned at the start of command responses?", [
                                 {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(1)},
                                 {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(0)}
+                            ], (err,mid) => id = mid);
+                        }},
+                        {emoji: bf.buttons["5"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                            let id;
+                            function setHooktubePref(pref) {
+                                db.run("UPDATE Users SET hooktube=? WHERE userID=?", [pref, userID], function(err, dbr) {
+                                    if (!err) bf.addReaction(channelID, id, "✅");
+                                    else bf.addReaction(channelID, id, "❎");
+                                });
+                            }
+                            bf.reactionMenu(channelID, "Would you like to be able to get a HookTube link  to the same video every time you post a YouTube link?", [
+                                {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setHooktubePref(1)},
+                                {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setHooktubePref(0)}
                             ], (err,mid) => id = mid);
                         }}
                     ]);

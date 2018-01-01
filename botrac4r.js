@@ -30,6 +30,15 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/beans/beans.js",
+        dest: "bot commands"
+    },{
+        filename: __dirname+"/names.js",
+        dest: "bot framework"
+    },{
+        filename: __dirname+"/only-cloud-cares.js",
+        dest: "bot commands"
     }
 ];
 
@@ -93,15 +102,8 @@ function loadModules(module) {
                 Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db, reloadEvent: reloadEvent})); // Load it as bot commands
                 break;
             }
-            if (bot.connected) {
-                // It's starting to get annoying.
-                //bf.sendMessage("160197704226439168", "Loaded **"+m.filename+"**");
-            }
         } catch (e) {
-            if (bot.connected) {
-                // It's starting to get annoying.
-                //bf.sendMessage("160197704226439168", "Failed to load module **"+m.filename+"**: `"+e+"`");
-            } else if (cf.log) {
+            if (cf.log) {
                 cf.log("Failed to reload module "+m.filename+"\n"+e, "error");
             } else {
                 console.log("Failed to reload module "+m.filename+"\n"+e);
@@ -132,17 +134,26 @@ bot.once("allUsers", function() { // Once the bot connects
 bot.on("message", function(user, userID, channelID, message, event) {
     if (!bot.users[userID]) return; // Ignore "fake users"
     if (bot.users[userID].bot) return; // Ignore other bots
+    if (message == defaultPrefix+"configure") {
+        bc.setup.code(userID, channelID, "", event.d);
+        return;
+    }
     let data = event.d;
-    db.get("SELECT prefix, seperator, altSeperator FROM Users WHERE userID = ?", userID, function(err, dbr) {
+    db.get("SELECT * FROM Users WHERE userID = ?", userID, function(err, dbr) {
         if (!dbr) {
             //bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
-            dbr = {prefix: defaultPrefix, seperator: defaultSeperator, altSeperator: defaultAltSplit};
-            db.run("INSERT INTO Users VALUES (?, ?, ?, ?, ?)", [userID, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
+            dbr = {prefix: defaultPrefix, isRegex: 0, seperator: defaultSeperator, altSeperator: defaultAltSplit};
+            db.run("INSERT INTO Users VALUES (?, ?, 0, ?, ?, ?, 0)", [userID, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
         }
-        let { prefix, seperator, altSeperator } = dbr;
+        let { prefix, seperator, altSeperator, isRegex } = dbr;
         //log(event, "info");
-        if (message.startsWith(prefix)) { // If the message starts with the bot prefix
-            let mp = message.slice(prefix.length).split(seperator);
+        let mp;
+        if (isRegex) {
+            if (message.match(prefix)) mp = message.split(message.match(prefix)[0]).join("").split(seperator);
+        } else {
+            if (message.startsWith(prefix)) mp = message.slice(prefix.length).split(seperator);
+        }
+        if (mp) {
             for (let c in bc) { // Find a bot command whose alias matches
                 if (bc[c].aliases.includes(mp[0])) {
                     bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data); // Call it
