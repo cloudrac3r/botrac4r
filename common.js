@@ -152,7 +152,11 @@ module.exports = {
     tableify: function(columns, align) {
         for (let i = 0; i < columns.length; i++) { // Convert all entries to strings
             for (let j = 0; j < columns[0].length; j++) {
-                columns[i][j] = columns[i][j].toString();
+                if (typeof(columns[i][j]) == "undefined") {
+                    columns[i][j] = "undefined";
+                } else {
+                    columns[i][j] = columns[i][j].toString();
+                }
             }
         }
         if (!align) align = []; // undefined align defaults to left
@@ -179,5 +183,10 @@ module.exports = {
             if (i < output[0].length-1) outputString += "\n"; // Seperate rows with a newline
         }
         return outputString;
+    },
+    iterateObject: function(object, iterator) {
+        for (let key in Object.keys(object)) {
+            iterator(key, object[key]);
+        }
     }
 }
