@@ -5,15 +5,20 @@ module.exports = function(input) {
     // Consts
     const petIDs = {
         channel: "387802247926513687",
-        glanceDisplay: "387810251824693249",
-        shop: "387859510540107776"
+        glanceDisplay: "389295719816626176",
+        shop: "389295722077356032"
     };
     const maxStat = 20;
 
     // Globals
     let lastRestartFooter = new Date();
     let messageEditQueue = []; // {messageID: "", embed: {}, priority: 0, callback: Function}
-    let messageEditQueueEmptying = 0;
+    let messageEditInProgress = [];
+    let messageEditRateCap = 5;
+    let messageEditRateRemaining = messageEditRateCap;
+    let messageEditRateReset = 5100;
+    let messageEditRateTimeout = {"_called": true};
+    let messageEditQueueEmptying = 0; //TODO: remove
     let users = [];
 
     // Classes
@@ -24,18 +29,25 @@ module.exports = function(input) {
             this.hp = 20;
             this.fed = 20;
             this.age = 0;
+            this.gender = (Math.random()<0.5 ? "male" : "female");
             owner.pets.push(this);
-            if (callback) petdb.run("INSERT INTO Pets VALUES (?,?,?,?,?)", [this.id, this.name, this.hp, this.fed, this.age], callback);
+            if (callback) petdb.run("INSERT INTO Pets VALUES (?,?,?,?,?,?)", [this.id, this.name, this.hp, this.fed, this.age, this.gender], callback);
         }
         save(callback) {
             if (!callback) callback = new Function();
-            petdb.run("UPDATE Pets SET name=?,hp=?,fed=?,age=? WHERE id=?", [this.name, this.hp, this.fed, this.age, this.id], callback);
+            petdb.run("UPDATE Pets SET name=?,hp=?,fed=?,age=?,gender=? WHERE id=?", [this.name, this.hp, this.fed, this.age, this.id, this.gender], callback);
         }
         statsToDisplay() {
-            return valueToMeter(cf.map(this.statsToHappiness(), 0, maxStat, 0, 9))+valueToMeter(cf.map(this.fed, 0, maxStat, 0, 9));
+            return ` ${valueToMeter(cf.map(this.hp, 0, maxStat, 0, 9))} Health\n${valueToMeter(cf.map(this.statsToHappiness(), 0, maxStat, 0, 9))} Happiness\n${valueToMeter(cf.map(this.fed, 0, maxStat, 0, 9))} Fed`;
         }
         statsToHappiness() {
-            return cf.map(Math.min(this.hp, this.fed*0.7+maxStat*0.3), 0, maxStat, 0, 20);
+            return Math.min(this.hp, this.fed*0.7+maxStat*0.3);
+        }
+        statsToHappinessDisplay() {
+            return valueToMeter(cf.map(this.statsToHappiness(), 0, maxStat, 0, 9));
+        }
+        getDisplayName() {
+            return this.name+" "+genderToSymbol(this.gender);
         }
     }
     class User {
@@ -43,16 +55,96 @@ module.exports = function(input) {
             this.userID = userID;
             this.pets = [];
             this.paused = false;
+            this.currentPetNumber = 0;
+            this.menu = "";
+            this.messageID = undefined;
             users.push(this);
+            bot.getMessages({channelID: petIDs.channel}, (e,a) => {
+                let m;
+                try {
+                    m = a.find(m => m.embeds && m.embeds.find(e => e.footer.text == this.userID));
+                } catch (e) {};
+                new Promise((resolve, reject) => {
+                    if (!m) {
+                        bf.sendMessage(petIDs.channel, bot.users[this.userID].username+" placeholder", (e,id) => {
+                            this.messageID = id;
+                            resolve();
+                        });
+                    } else {
+                        this.messageID = m.id;
+                        resolve();
+                    }
+                }).then(() => {
+                    this.updateDisplay();
+                    bf.reactionMenu(petIDs.channel, this.messageID, [
+                        {emoji: bf.buttons["right"], remove: "user", actionType: "js", actionData: () => {
+                            if (this.menu == "") {
+                                this.selectNextPet();
+                                this.updateDisplay();
+                            }
+                        }},
+                        {emoji: bf.buttons["end"], remove: "user", allowedUsers: [this.userID], actionType: "js", actionData: () => {
+                            if (this.menu) {
+                                if (this.menu.includes(".")) this.menu = this.menu.split(".").slice(0, -1).join(".");
+                                else this.menu = "";
+                                this.updateDisplay();
+                            }
+                        }},
+                        {emoji: bf.buttons["1"], remove: "user", allowedUsers: [this.userID], actionType: "js", actionData: () => {
+                        }},
+                        {emoji: bf.buttons["2"], remove: "user", allowedUsers: [this.userID], actionType: "js", actionData: () => {
+                        }},
+                        {emoji: bf.buttons["3"], remove: "user", allowedUsers: [this.userID], actionType: "js", actionData: () => {
+                        }}
+                    ]);
+                    //TODO: action handler
+                });
+            });
             if (callback) petdb.run("INSERT INTO Users VALUES (?,'')", [this.userID], callback);
+        }
+        currentPet() {
+            return this.pets[this.currentPetNumber];
+        }
+        updateDisplay() {
+            let fields = [];
+            switch (this.menu) {
+            default:
+                bf.buttons["1"]+" Feed\n"+
+                bf.buttons["2"]+" Shop"
+            }
+            smartEditMessage(this.messageID, {
+                author: {
+                    name: bot.users[this.userID].username,
+                    icon_url: "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users[this.userID].avatar+".jpg"
+                },
+                title: this.currentPet().getDisplayName(),
+                description: this.currentPet().statsToDisplay(),
+                fields: fields,
+                footer: {
+                    text: this.userID
+                }
+            }, 1);
         }
         save(callback) {
             if (!callback) callback = new Function();
             petdb.run("UPDATE Users SET pets=? WHERE userID=?", [this.pets.map(p => p.id).join(","), this.userID]);
         }
+        selectNextPet() {
+            if (++this.currentPetNumber >= this.pets.length) this.currentPetNumber = 0;
+        }
     }
 
     // General functions
+    function genderToSymbol(gender) {
+        switch (gender) {
+        case "male":
+            return "♂";
+        case "female":
+            return "♀";
+        default:
+            return "?";
+        }
+    }
     function loadData(callback) {
         if (!callback) callback = new Function();
         petdb.all("SELECT * FROM Users", function(err,udbr) {
@@ -69,39 +161,57 @@ module.exports = function(input) {
             });
         });
     }
+
     function smartEditMessage(messageID, embed, priority, callback) {
         // Priorities — 0: menu, 1: interactive update, 2: interval update
         if (!callback) callback = new Function();
-        messageEditQueue.push({channelID: petIDs.channelID, messageID: messageID, embed: embed, priority: priority, callback: callback});
-        emptyQueue();
-        function emptyQueue() {
-            if (!messageEditQueueEmptying) {
-                let messageIDs = [];
-                messageEditQueue = messageEditQueue.filter((m,i) => !messageEditQueue.slice(i+1).some(n => n.messageID == m.messageID));
-                //cf.log(messageEditQueue, "warning");
-                messageEditQueue.sort((a,b) => (b.priority-a.priority)).forEach(m => {
-                    messageEditQueueEmptying++;
-                    bot.editMessage({channelID: petIDs.channel, messageID: m.messageID, embed: m.embed}, function(err) {
-                        messageEditQueueEmptying--;
-                        if (!err) {
-                            messageEditQueue = messageEditQueue.filter(n => n.messageID != m.messageID);
+        if (!messageEditInProgress.some(message => message.messageID == messageID)) { // If same message is not currently being edited,
+            messageEditQueue.unshift({channelID: petIDs.channelID, messageID: messageID, embed: embed, priority: priority, callback: callback}); // continue
+        } else { // otherwise,
+            cf.log("Already being edited", "info"); // stop
+            return;
+        }
+        (function emptyQueue() {
+            messageEditQueue = messageEditQueue.sort((a,b) => (a.priority-b.priority)) // Sort by important and remove duplicates
+                                               .filter((m,i) => !messageEditQueue.slice(0, i).some(n => n.messageID == m.messageID));
+            //cf.log(JSON.stringify(messageEditQueue, null, 4), "warning");
+            messageEditQueue.forEach(message => { // For each message
+                if (messageEditRateRemaining == 0) { // If rate limit exceeded
+                    cf.log("Rate limit hit on "+message.messageID+", priority "+message.priority, "info");
+                } else { // If rate limit not exceeded
+                    //cf.log("About to edit     "+message.messageID+", priority "+message.priority, "info");
+                    if (messageEditRateTimeout._called) { // If no reset timer is running
+                        messageEditRateTimeout = setTimeout(resetLimit, messageEditRateReset); // Start the reset timer
+                    }
+                    messageEditRateRemaining--;
+                    messageEditQueue = messageEditQueue.filter(m => m != message); // Remove from queue
+                    messageEditInProgress.push(message); // Add to in progress
+                    bot.editMessage({channelID: petIDs.channel, messageID: message.messageID, embed: message.embed}, function(err) { // Edit the message
+                        messageEditInProgress = messageEditInProgress.filter(m => m != message); // No longer in progress
+                        if (!err) { // No errors! Yay!
+                            //cf.log("Edited message "+message.messageID+", priority "+message.priority, "spam");
                             callback(null);
-                        } else if (err.response && err.response.message == "You are being rate limited") {
-                            setTimeout(function() {
-                                cf.log("Pet rate-limit hit, priority "+priority, (priority < 1 ? "error" : "info"));
-                                emptyQueue();
-                            }, err.response.retry_after);
-                        } else {
+                        } else if (err.response && err.response.message == "You are being rate limited.") { // Somehow rate limited anyway
+                            cf.log("Somehow rate limited anyway", "warning");
+                            messageEditQueue.unshift(message); // Add back to the queue
+                            if (messageEditRateTimeout._called) { // If reset time is not already running
+                                setTimeout(resetLimit, err.response.retry_after); // Start the reset timer
+                            }
+                        } else { // Other error
                             cf.log(err, "error");
-                            //emptyQueue();
                         }
                     });
-                });
+                }
+            });
+            function resetLimit() { // Reset rate limit counters
+                messageEditRateRemaining = messageEditRateCap; // The counter
+                if (messageEditQueue.length) emptyQueue(); // If messages are queued, they may now be acted on
             }
-        }
+        })();
     }
+    //for (let i = 0; i < 12; i++) smartEditMessage(Math.random().toString(), {}, 1, new Function()); // For testing
     function valueToMeter(value, notFound) {
-        value = Math.floor(Math.min(Math.max(Number(value), 0), 49));
+        value = Math.floor(Math.min(Math.max(Number(value), 0), 9));
         let emojiName = "lv"+value.toString()
         let emojiServer = bot.servers["364914967775805440"];
         if (!emojiName || !emojiServer) {
@@ -122,8 +232,8 @@ module.exports = function(input) {
             timestamp: lastRestartFooter.toJSON()
         };
         embed.fields = users.map(u => ({
-            name: bf.userIDToEmoji(u.userID)+" "+bot.users[u.userID].username+" ("+u.pets.length+")",
-            value: "​"+u.pets.map(p => ` ${p.statsToDisplay()} | ${p.name}`).join("\n"), //SC: U+200B zero-width space, U+2004 three-per-em space
+            name: `${bf.userIDToEmoji(u.userID)} ${bot.users[u.userID].username} (${u.pets.length})`,
+            value: u.pets.map(p => `${p.statsToHappinessDisplay()} ${p.name}`).join("\n"),
             inline: true
         }));
         smartEditMessage(petIDs.glanceDisplay, embed, 2);
@@ -138,7 +248,7 @@ module.exports = function(input) {
             } catch (e) {
                 cf.log(e, "error");
             }
-        }, 2000);
+        }, 10000);
         reloadEvent.once(__filename, function() {
             clearInterval(updateGlanceDisplayInterval);
         });
@@ -159,7 +269,7 @@ module.exports = function(input) {
                                     resolve();
                                 }
                             }).then(() => {
-                                let name = message.toUpperCase().slice(0,1)+message.toLowerCase().slice(1);
+                                //let name = message.toUpperCase().slice(0,1)+message.toLowerCase().slice(1);
                                 let newPet = new Pet(name, userObject, () => {
                                     userObject.save();
                                     bf.sendMessage(channelID, "OK! You may now switch back to <#"+event.d.channel_id+">.");
@@ -176,22 +286,40 @@ module.exports = function(input) {
             }}
         ]);
     }
-    loadData(() => {
-        if (bot.connected) {
+    if (bot.connected) {
+        loadData(() => {
             realCode();
-        } else {
-            bot.once("ready", realCode);
-        }
-    });
+        });
+    } else {
+        bot.once("allUsers", () => {
+            loadData(() => {
+                realCode();
+            });
+        });
+    }
 
     // Available functions
     let availableFunctions = {
         pet: {
             aliases: ["pet", "pets"],
-            shorthelp: "The official sequel to Hippo Clicker™",
+            shortHelp: "The official sequel to Hippo Clicker™",
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
+                if (command.regularWords[0] == "reset" && channelID == petIDs.channel) {
+                    bot.getMessages({channelID: petIDs.channel}, function(e,a) {
+                        bot.deleteMessages({channelID: petIDs.channel, messageIDs: a.map(m => m.id)}, function() {
+                            bf.sendMessage(petIDs.channel, "Pets at a glance", function(e,id) {
+                                cf.log(petIDs.glanceDisplay = id, "warning");
+                                bf.sendMessage(petIDs.channel, "Shop", function(e,id) {
+                                    cf.log(petIDs.shop = id, "warning");
+                                });
+                            });
+                        });
+                    });
+                } else {
+                    bf.sendMessage(channelID, eval(command.input));
+                }
             }
         }
     };
