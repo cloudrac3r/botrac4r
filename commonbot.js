@@ -19,9 +19,11 @@ module.exports = function(input) {
             // Words
             "end": "<:bn_en:327896461272678400>",
             // Punctuation
+            "exclamation": "<:bn_ex:331164187831173120>",
             "question": "<:bn_qu:331164190267932672>",
             // Operators
             "plus": "<:bn_pl:328041457695064064>",
+            "minus": "<:bn_mi:328042285704937472>",
             "times": "<:bn_ti:327986149203116032>",
             "plusminus": "<:bn_pm:327986149022760960>",
             // Arrows
@@ -81,7 +83,7 @@ module.exports = function(input) {
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
             if (!prefer) prefer = "";
-            if (serverID) {
+            if (serverID && bot.servers[serverID].members[userID]) {
                 if (bot.servers[serverID].members[userID].nick) {
                     if (prefer.startsWith("user")) {
                         return bot.users[userID].username+" ("+bot.servers[serverID].members[userID].nick+")";
@@ -165,7 +167,7 @@ module.exports = function(input) {
             new Promise(function(resolve, reject) {
                 if (additional.mention) {
                     db.get("SELECT mention FROM Users WHERE userID = ?", additional.mention, function(err, dbr) {
-                        if (dbr.mention == 1) {
+                        if (dbr && dbr.mention == 1) {
                             message = "<@"+additional.mention+"> "+message;
                         }
                         delete additional.mention;
