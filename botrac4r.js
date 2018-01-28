@@ -185,7 +185,7 @@ bot.on("message", function(user, userID, channelID, message, event) {
     });
 });
 
-bot.on("disconnect", function(code) {
-    log("Disconnected from Discord ("+code+"), will reconnect automatically.", "info");
+bot.on("disconnect", function(err, code) {
+    log("Disconnected from Discord ("+err+code+"), will reconnect automatically.", "info");
     bot.connect();
 });
