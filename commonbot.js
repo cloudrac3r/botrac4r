@@ -82,6 +82,7 @@ module.exports = function(input) {
         },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
+            if (!bot.users[userID]) return "(unknown user: "+userID+")";
             if (!prefer) prefer = "";
             if (serverID && bot.servers[serverID].members[userID]) {
                 if (bot.servers[serverID].members[userID].nick) {
