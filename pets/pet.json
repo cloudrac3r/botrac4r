@@ -1,0 +1,77 @@
+[
+    {
+        "userID": "176580265294954507",
+        "pets": [
+            {
+                "id": "1514862479234",
+                "name": "Garirry II",
+                "hp": 20,
+                "fed": 20,
+                "age": 0,
+                "gender": "male"
+            },
+            {
+                "id": "1514862707514",
+                "name": "Bob II",
+                "hp": 20,
+                "fed": 20,
+                "age": 0,
+                "gender": "male"
+            }
+        ],
+        "paused": false,
+        "currentPetNumber": 0,
+        "menu": "",
+        "messageID": "397586801633525760"
+    },
+    {
+        "userID": "113442380811649024",
+        "pets": [
+            {
+                "id": "1514863086324",
+                "name": "Citron",
+                "hp": 20,
+                "fed": 20,
+                "age": 0,
+                "gender": "male"
+            }
+        ],
+        "paused": false,
+        "currentPetNumber": 0,
+        "menu": "",
+        "messageID": "397589347504881666"
+    },
+    {
+        "userID": "134826546694193153",
+        "pets": [
+            {
+                "id": "1514864159018",
+                "name": "Spike the Panda",
+                "hp": 20,
+                "fed": 20,
+                "age": 0,
+                "gender": "female"
+            }
+        ],
+        "paused": false,
+        "currentPetNumber": 0,
+        "menu": "",
+        "messageID": "397593847401545738"
+    },
+    {
+        "userID": "116718249567059974",
+        "pets": [
+            {
+                "id": "1514864218805",
+                "name": "<a:mooning:394019433493954571>",
+                "hp": 20,
+                "fed": 20,
+                "age": 0,
+                "gender": "male"
+            }
+        ],
+        "paused": false,
+        "currentPetNumber": 0,
+        "menu": ""
+    }
+]
