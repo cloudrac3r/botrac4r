@@ -188,5 +188,36 @@ module.exports = {
         for (let key in Object.keys(object)) {
             iterator(key, object[key]);
         }
+    },
+    o2a: function(object, includeKeys) {
+        if (includeKeys) return Object.keys(object).map(key => ({key, item: object[key]}));
+        else return Object.keys(object).map(key => object[key]);
+    },
+    mergeObjects: function(objArr) { // Stolen from StackOverflow: https://stackoverflow.com/a/383245
+        if (objArr.length >= 3) {
+            objArr = [objArr[0], module.exports.mergeObjects(objArr.slice(1))];
+        }
+        let obj1 = objArr[0];
+        let obj2 = objArr[1];
+        for (var p in obj2) {
+            try {
+                if (obj2[p].constructor == Object) {
+                    obj1[p] = module.exports.mergeObjects([obj1[p], obj2[p]]);
+                } else {
+                    obj1[p] = obj2[p];
+                }
+            } catch (e) {
+                obj1[p] = obj2[p];
+            }
+        }
+        return obj1;
+    },
+    numberToFullwidth: function(number) {
+        if (number.toString().length > 1) {
+            return number.toString().split("").map(n => module.exports.numberToFullwidth(n)).join("");
+        } else {
+            const fullwidth = ["𝟢", "𝟣", "𝟤", "𝟥", "𝟦", "𝟧", "𝟨", "𝟩", "𝟪", "𝟫"];
+            return fullwidth[number];
+        }
     }
 }

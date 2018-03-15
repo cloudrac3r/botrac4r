@@ -27,10 +27,10 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/garfield.js",
         dest: "bot commands"
-    },{
+    },{/*
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
-    },{
+    },{*/
         filename: __dirname+"/beans/beans.js",
         dest: "bot commands"
     },{
@@ -38,6 +38,12 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot framework"
     },{
         filename: __dirname+"/only-cloud-cares.js",
+        dest: "bot commands"
+    },{
+        filename: __dirname+"/lock.js",
+        dest: "bot commands"
+    },{
+        filename: __dirname+"/rpg/main.js",
         dest: "bot commands"
     }
 ];
@@ -74,7 +80,7 @@ stdin.on("data", function(input) {
         let output = eval(input);
         log(output, "responseInfo");
     } catch (e) { // Failed
-        log("Error while running code:\n"+e, "responseError");
+        log("Error in eval.\n"+e.stack, "responseError");
     }
 });
 
@@ -99,14 +105,14 @@ function loadModules(module) {
                 Object.assign(bf, require(m.filename)({bot: bot, cf: cf, db: db, reloadEvent: reloadEvent})); // Load it into bot framework
                 break;
             case "bot commands":
-                Object.assign(bc, require(m.filename)({bot: bot, cf: cf, bf: bf, db: db, reloadEvent: reloadEvent})); // Load it as bot commands
+                Object.assign(bc, require(m.filename)({Discord, bot, cf, bf, db, reloadEvent, loadModules})); // Load it as bot commands
                 break;
             }
         } catch (e) {
             if (cf.log) {
-                cf.log("Failed to reload module "+m.filename+"\n"+e, "error");
+                cf.log("Failed to reload module "+m.filename+"\n"+e.stack, "error");
             } else {
-                console.log("Failed to reload module "+m.filename+"\n"+e);
+                console.log("Failed to reload module "+m.filename+"\n"+e.stack);
             }
         }
         if (!m.watched) { // If file isn't already being watched,
