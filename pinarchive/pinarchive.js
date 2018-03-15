@@ -43,11 +43,17 @@ module.exports = function(input) {
                                 bot.getMessage({channelID: channelID, messageID: a[0].id}, function(e,r) {
                                     r.attachments.push({});
                                     r.embeds.push({});
-                                    bf.sendMessage(target, "", function(e) {
+                                    bf.sendMessage(target, "", function(e, id) {
                                         if (e) {
                                             cf.log(e, "error");
                                         } else {
-                                            bf.sendMessage(channelID, "OK! That pin has been sent to <#"+target+">.", {mention: userID});
+                                            bf.reactionMenu(channelID, "OK! That pin has been sent to <#"+target+">.", [
+                                                {emoji: bf.buttons["times"], allowedUsers: [userID], ignore: "total", remove: "message", actionType: "js", actionData: () => {
+                                                    bot.deleteMessage({channelID: target, messageID: id}, (e) => {
+                                                        if (!e) bf.sendMessage(channelID, "Pin archive message manually removed.");
+                                                    });
+                                                }}
+                                            ]);
                                         }
                                     }, {embed: {
                                         author: {
@@ -111,6 +117,7 @@ module.exports = function(input) {
                     .forEach(m => {
                         if (m.embeds[0].footer.text.match(/^.+ \| [0-9]{18,} \| pinned by .+$/)) {
                             let pinner = Object.keys(bot.users).find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == bot.users[u].username);
+                            //cf.log(pinner, "warning");
                             if (m.embeds[0].footer.text.includes(messageID)) {
                                 if (selfUnpin.includes(messageID)) {
                                     cf.log("Message unpinned by self due to pin limit, not removing from archive", "spam");
@@ -120,10 +127,10 @@ module.exports = function(input) {
                                     bot.deleteMessage({channelID: target, messageID: m.id});
                                 }
                             } else {
-                                cf.log("messageID did not match: "+messageID+" != "+m.embeds[0].footer.text, "spam");
+                                //cf.log("messageID did not match: "+messageID+" != "+m.embeds[0].footer.text, "spam");
                             }
                         } else {
-                            cf.log("Embed footer did not match: "+m.embeds[0].footer.text, "spam");
+                            //cf.log("Embed footer did not match: "+m.embeds[0].footer.text, "spam");
                         }
                     });
                 });

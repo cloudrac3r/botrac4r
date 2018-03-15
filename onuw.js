@@ -616,7 +616,7 @@ module.exports = function(input) {
                     players.forEach(p => game.addOrRemove(p));
                     let template = "**One Night Ultimate Werewolf**\n";
                     let id;
-                    bf.reactionMenu(channelID, template+"Current players (**"+game.players.length+"**): nobody", [
+                    bf.reactionMenu(channelID, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"), [
                         {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(event) {
                             game.addOrRemove(event.d.user_id);
                             game.lastActive = Date.now();
@@ -639,7 +639,7 @@ module.exports = function(input) {
                                 {mention: event.d.user_id});
                             bot.deleteMessage({channelID: channelID, messageID: lastCheckMessage[channelID]});
                         }},
-                        {emoji: bf.buttons["right"], remove: "user", actionType: "js", actionData: function(event) {
+                        {emoji: bf.buttons["tick"], remove: "user", actionType: "js", actionData: function(event) {
                             if (cardSets[game.players.length]) {
                                 //bot.deleteMessage({channelID: game.channelID, messageID: id});
                                 bot.removeAllReactions({channelID: game.channelID, messageID: id});
@@ -651,7 +651,7 @@ module.exports = function(input) {
                                 game.setUpCentreCards(cards);
                                 let interactID;
                                 game.players.forEach(p => {
-                                    bot.mute({userID: p.userID, serverID: game.serverID});
+                                    //bot.mute({userID: p.userID, serverID: game.serverID});
                                     p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
                                         p.interacted = true;
                                         if (typeof(order) == "number" && code) game.pendingActions.push({order: order, code: code});
@@ -662,9 +662,9 @@ module.exports = function(input) {
                                             game.pendingActions.length = 0;
                                             game.phase = "day";
                                             bot.deleteMessage({channelID: game.channelID, messageID: interactID});
-                                            game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
+                                            //game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
                                             const timeLimits = [
-                                                {before: 0, message: "**Time's up!**"},
+                                                {before: 0, message: "**Time's up!** "+game.players.map(p => "<@"+p.userID+">")},
                                                 {before: 30000, message: "30 seconds remaining!"},
                                                 {before: 60000, message: "1 minute remaining."}
                                             ];
@@ -754,7 +754,7 @@ module.exports = function(input) {
                                         {emoji: bf.buttons["info"], ignore: "none", remove: "user", actionType: "js", actionData: function() {
                                             //TODO
                                         }},
-                                        {emoji: bf.buttons["redo"], ignore: "total", remove: "all", actionType: "js", actionData: function() {
+                                        {emoji: bf.buttons["redo"], allowedUsers: game.players.map(p => p.userID), ignore: "total", remove: "all", actionType: "js", actionData: function() {
                                             startNewGame(game.players.map(p => p.userID));
                                         }}
                                     ]);

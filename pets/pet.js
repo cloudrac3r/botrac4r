@@ -1,24 +1,24 @@
 module.exports = function(input) {
     let {bot, cf, bf, db, reloadEvent} = input;
-    let sqlite = require("sqlite3");
-    let petdb = new sqlite.Database(__dirname+"/pet.db");
+    let fs = require("fs");
     // Consts
     const petIDs = {
         channel: "387802247926513687",
-        glanceDisplay: "389295719816626176",
-        shop: "389295722077356032"
+        glanceDisplay: "397585416188067840",
+        shop: "397585418830348299"
     };
     const maxStat = 20;
 
     // Globals
+    let currentlySaving = 0;
     let lastRestartFooter = new Date();
+    let lastSaveFooter = new Date();
     let messageEditQueue = []; // {messageID: "", embed: {}, priority: 0, callback: Function}
     let messageEditInProgress = [];
     let messageEditRateCap = 5;
     let messageEditRateRemaining = messageEditRateCap;
     let messageEditRateReset = 5100;
     let messageEditRateTimeout = {"_called": true};
-    let messageEditQueueEmptying = 0; //TODO: remove
     let users = [];
 
     // Classes
@@ -31,11 +31,7 @@ module.exports = function(input) {
             this.age = 0;
             this.gender = (Math.random()<0.5 ? "male" : "female");
             owner.pets.push(this);
-            if (callback) petdb.run("INSERT INTO Pets VALUES (?,?,?,?,?,?)", [this.id, this.name, this.hp, this.fed, this.age, this.gender], callback);
-        }
-        save(callback) {
-            if (!callback) callback = new Function();
-            petdb.run("UPDATE Pets SET name=?,hp=?,fed=?,age=?,gender=? WHERE id=?", [this.name, this.hp, this.fed, this.age, this.id, this.gender], callback);
+            if (callback) saveData(callback);
         }
         statsToDisplay() {
             return ` ${valueToMeter(cf.map(this.hp, 0, maxStat, 0, 9))} Health\n${valueToMeter(cf.map(this.statsToHappiness(), 0, maxStat, 0, 9))} Happiness\n${valueToMeter(cf.map(this.fed, 0, maxStat, 0, 9))} Fed`;
@@ -100,7 +96,7 @@ module.exports = function(input) {
                     //TODO: action handler
                 });
             });
-            if (callback) petdb.run("INSERT INTO Users VALUES (?,'')", [this.userID], callback);
+            if (callback) saveData(callback);
         }
         currentPet() {
             return this.pets[this.currentPetNumber];
@@ -125,10 +121,6 @@ module.exports = function(input) {
                 }
             }, 1);
         }
-        save(callback) {
-            if (!callback) callback = new Function();
-            petdb.run("UPDATE Users SET pets=? WHERE userID=?", [this.pets.map(p => p.id).join(","), this.userID]);
-        }
         selectNextPet() {
             if (++this.currentPetNumber >= this.pets.length) this.currentPetNumber = 0;
         }
@@ -147,7 +139,7 @@ module.exports = function(input) {
     }
     function loadData(callback) {
         if (!callback) callback = new Function();
-        petdb.all("SELECT * FROM Users", function(err,udbr) {
+        /*petdb.all("SELECT * FROM Users", function(err,udbr) {
             petdb.all("SELECT * FROM Pets", function(err,pdbr) {
                 udbr.forEach(u => {
                     let newUser = new User(u.userID);
@@ -159,9 +151,47 @@ module.exports = function(input) {
                 //cf.log(users);
                 callback();
             });
+        });*/
+        fs.readFile(__dirname+"/pet.json", function(err,data) {
+            let content = JSON.parse(data.toString());
+            content.forEach(user => { // For each user
+                let newUser = new User(user.userID); // Create a user
+                user.pets.forEach(pet => { // For each old pet
+                    let newPet = new Pet(pet.name, newUser); // Create a pet and register it to that user
+                    Object.assign(newPet, pet); // Give the new pet all the stats of the old pet
+                });
+                delete user.pets; // Prevent old from overwriting new
+                Object.assign(newUser, user);
+            });
+            callback();
         });
     }
-
+    function saveData(callback) {
+        if (!callback) callback = new Function();
+        if (currentlySaving) {
+            callback("Currently saving data, save cancelled.");
+            return;
+        } else {
+            currentlySaving = 1;
+            fs.writeFile(__dirname+"/pet.json~", JSON.stringify(users, null, 4), function(err) {
+                if (err) {
+                    currentlySaving = 0;
+                    callback(err);
+                } else {
+                    fs.rename(__dirname+"/pet.json~", __dirname+"/pet.json", function(err) {
+                        if (err) {
+                            currentlySaving = 0;
+                            callback(err);
+                        } else {
+                            currentlySaving = 0;
+                            lastSaveFooter = new Date();
+                            callback(null);
+                        }
+                    });
+                }
+            });
+        }
+    }
     function smartEditMessage(messageID, embed, priority, callback) {
         // Priorities — 0: menu, 1: interactive update, 2: interval update
         if (!callback) callback = new Function();
@@ -227,7 +257,8 @@ module.exports = function(input) {
         let embed = {
             title: "Pets at a glance",
             footer: {
-                text: "Last code update "+Math.floor((Date.now()-lastRestartFooter.getTime())/1000)+" seconds ago"
+                text: "Last code update "+Math.floor((Date.now()-lastRestartFooter.getTime())/1000)+" seconds ago | "+
+                      "Last data save "+Math.floor((Date.now()-lastSaveFooter.getTime())/1000)+" seconds ago"
             },
             timestamp: lastRestartFooter.toJSON()
         };
@@ -270,8 +301,8 @@ module.exports = function(input) {
                                 }
                             }).then(() => {
                                 //let name = message.toUpperCase().slice(0,1)+message.toLowerCase().slice(1);
+                                let name = message;
                                 let newPet = new Pet(name, userObject, () => {
-                                    userObject.save();
                                     bf.sendMessage(channelID, "OK! You may now switch back to <#"+event.d.channel_id+">.");
                                     updateGlanceDisplay(1);
                                 });
@@ -306,9 +337,11 @@ module.exports = function(input) {
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
+                if (channelID != petIDs.channel) return; //TODO
                 if (command.regularWords[0] == "reset" && channelID == petIDs.channel) {
                     bot.getMessages({channelID: petIDs.channel}, function(e,a) {
-                        bot.deleteMessages({channelID: petIDs.channel, messageIDs: a.map(m => m.id)}, function() {
+                        bot.deleteMessages({channelID: petIDs.channel, messageIDs: a.map(m => m.id)}, function(err) {
+                            if (err) cf.log(err, "error");
                             bf.sendMessage(petIDs.channel, "Pets at a glance", function(e,id) {
                                 cf.log(petIDs.glanceDisplay = id, "warning");
                                 bf.sendMessage(petIDs.channel, "Shop", function(e,id) {
@@ -317,6 +350,9 @@ module.exports = function(input) {
                             });
                         });
                     });
+                } else if (command.regularWords[0] == "save" && channelID == petIDs.channel) {
+                    bot.deleteMessage({channelID: petIDs.channelID, messageID: d.id});
+                    saveData(console.log);
                 } else {
                     bf.sendMessage(channelID, eval(command.input));
                 }

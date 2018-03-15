@@ -83,7 +83,7 @@ module.exports = function(input) {
             }
         },
         setup: {
-            aliases: ["configure", "setup", "prefix", "option", "options"],
+            aliases: ["configure", "setup", "prefix", "option", "options", "settings"],
             shortHelp: "Configure your prefix and split preferences.",
             reference: "",
             longHelp: "A menu will appear allowing you to change settings.",

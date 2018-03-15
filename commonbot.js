@@ -27,6 +27,7 @@ module.exports = function(input) {
             "times": "<:bn_ti:327986149203116032>",
             "plusminus": "<:bn_pm:327986149022760960>",
             // Arrows
+            "down": "<:bn_do:328724374498836500>",
             "right": "<:bn_fo:328724374465282049>",
             "redo": "<:bn_re:362741439211503616>",
             "point down": "<:cbn_ptd:389238901233025034>",
@@ -38,7 +39,9 @@ module.exports = function(input) {
             "clock": "<:cbn_clock:381652491999117313>",
             "yes": "<:bn_yes:331164192864206848>",
             "no": "<:bn_no:331164190284972034>",
-            "blank": "<:bn_bl:330501355737448450>"
+            "blank": "<:bn_bl:330501355737448450>",
+            "green tick": "✅",
+            "green cross": "❎"
         },
         userEmojis: {
             "112767329347104768": "00",
@@ -143,6 +146,12 @@ module.exports = function(input) {
         },
         // Send a message to a channel.
         sendMessage: function(channelID, message, callback, additional) {
+            if (typeof(callback) == "object") {
+                additional = callback;
+                callback = new Function();
+            } else if (typeof(callback) != "function") {
+                callback = new Function(); // Create an empty callback function to use instead
+            }
             if (!additional) additional = {};
             if (!channelID) { // Obviously a channelID is needed
                 cf.log("Need a channelID to send a message to", "warning");
@@ -151,12 +160,6 @@ module.exports = function(input) {
             if (!message && !additional.embed) { // Empty messages don't work, so don't try
                 cf.log("Cannot send empty message", "warning");
                 return;
-            }
-            if (typeof(callback) == "object") {
-                additional = callback;
-                callback = new Function();
-            } else if (typeof(callback) != "function") {
-                callback = new Function(); // Create an empty callback function to use instead
             }
             if (typeof(message) == "object") { // Convert objects to strings
                 if (additional.largeObject) {
@@ -397,7 +400,7 @@ module.exports = function(input) {
                 return;
             }
             if (!message) {
-                cf.log("Need a message to send to react to", "warning");
+                cf.log("Need a message to send or messageID to use", "warning");
                 return;
             }
             if (!callback) callback = new Function();
