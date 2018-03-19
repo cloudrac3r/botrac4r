@@ -118,7 +118,7 @@ module.exports = function(input) {
                 cf.o2a(object, true).forEach(prop => {
                     let {key, item} = prop;
                     //console.log(prop);
-                    if (typeof(item) == "object") {
+                    if (typeof(item) == "object" && item !== null) {
                         //console.log(">> "+path.concat([key]).join("."));
                         if (!ignorePaths.includes(path.concat([key]).join("."))) {
                             let old = {...last};

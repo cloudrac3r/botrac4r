@@ -436,10 +436,10 @@ module.exports = function(input) {
                     }
                 }).then(function() {
                     if (!isID) {
-                        availableFunctions.sendMessage(channelID, message, function(err, messageID) {
+                        availableFunctions.sendMessage(channelID, message, function(err, messageID, res) {
                             if (messageID) {
                                 availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
-                                    callback(err, messageID);
+                                    callback(err, messageID, res);
                                 });
                                 reactionMenus[messageID] = {actions: actions, channelID: channelID};
                             } else {

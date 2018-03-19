@@ -50,11 +50,11 @@ module.exports = function(input) {
              */
             if (room != undefined) this.room = room;
             if (subroom != undefined) this.subroom = subroom;
-            notice.emit("setLocation", this);
+            notice.emit("setLocation", room, subroom, this);
             // Now check for traps and stuff
         }
     }
-    Classes.FakeSubroom = class FakeSubroom extends Classes.Thing { //TODO: comments
+    Classes.FakeSubroom = class FakeSubroom extends Classes.Thing {
         constructor(name, room, data, hidden) {
             let others = beings.filter(b => b.type == "fakeSubroom");
             super((name || "FakeSubroom"+others.length), room, undefined, true);
@@ -160,9 +160,9 @@ module.exports = function(input) {
             };
             this.inventory = []; // duh
             this.equipment = { // equipment is moved from the inventory to these slots when it is equipped
-                melee: undefined,
-                ranged: undefined,
-                magic: undefined
+                melee: null,
+                ranged: null,
+                magic: null
             };
         }
         embedAuthor() { // return name and avatar for display as author of an embed
@@ -177,7 +177,7 @@ module.exports = function(input) {
                 {position: 2, path: ["item", "constructor", "name"], code: (input, item) => (input.toLowerCase() == item.toLowerCase)}
             ]);
         }
-        startDialogue(talkID, caller) { //TODO: comments
+        startDialogue(talkID, caller) {
             let q = di[talkID];
             let current = q.start;
             let mid;
@@ -186,7 +186,7 @@ module.exports = function(input) {
                 return q.list[current].options.map((o,i) => {
                 });
             }*/
-            let getEmbed = () => {
+            let getEmbed = () => { // Get the current dialogue state and generate an embed
                 if (current == "END") {
                     return {
                         author: this.embedAuthor(),
@@ -207,33 +207,41 @@ module.exports = function(input) {
                     }
                 }
             }
-            let showNextBox = () => {
+            let showNextBox = () => { // Edit the message to the content from getEmbed
                 bf.editMessage(game.channel, mid, "", undefined, {embed: getEmbed()});
             }
-            let actionManager = (event) => {
-                let button = parseInt(event.d.emoji.name.split("_")[1])-1;
-                let choice = q.list[current].options[button];
-                if (!choice) {
-                    bf.removeReaction(game.channel, mid, event.d.emoji, event.d.user_id);
+            let actionManager = (event) => { // Take actions based on button presses
+                let button = parseInt(event.d.emoji.name.split("_")[1])-1; // The number on the button - 1
+                let choice = q.list[current].options[button]; // The information to act upon from the dialogue file
+                if (!choice) { // If the button wasn't an option...
+                    bf.removeReaction(game.channel, mid, event.d.emoji, event.d.user_id); // remove the user's reaction.
                     return;
                 }
-                current = choice.route;
-                showNextBox();
-                if (choice.route == "END") {
-                    bot.removeAllReactions({channelID: game.channel, messageID: mid});
-                } else {
-                    bf.removeReaction(game.channel, mid, event.d.emoji, event.d.user_id);
+                let codeOutput;
+                if (choice.code) { // If code is available...
+                    codeOutput = choice.code({game, beings, ut, Classes, speaker: this, caller}); // run it and store the output.
                 }
-                if (choice.code) {
-                    choice.code({game, beings, ut, Classes, speaker: this, caller});
+                if (choice.route == "CODE") { // If next room depends on code output...
+                    current = codeOutput; // go there.
+                } else { // Otherwise...
+                    current = choice.route; // go where the route says to go.
                 }
+                if (choice.route == "END") { // If you reached the end...
+                    bot.removeAllReactions({channelID: game.channel, messageID: mid}); // remove all buttons.
+                }
+                showNextBox(); // Something changed, so update the display
             }
+            /* Set up buttons
+             * Go down the tree of possible messages and choices, find the one with the most buttons,
+             * and add those buttons to the message.
+             * Every action should direct to actionManager.
+             */
             let actions = Object.values(q.list).sort((a,b) => b.options.length-a.options.length)[0].options.map((o,i) => ({
                 emoji: bf.buttons[i+1],
                 actionType: "js",
                 actionData: actionManager
             }));
-            bf.sendMessage(game.channel, "", (err,id) => {
+            bf.sendMessage(game.channel, "", (err,id) => { // Send the inital menu
                 if (err) cf.log(err, "error");
                 mid = id;
                 bf.reactionMenu(game.channel, mid, actions);
@@ -247,64 +255,62 @@ module.exports = function(input) {
                 /* Actions are functions that do something do another thing and are designed to display nicely and to be called by a human with a text command
                  * for example, this player could attack something, look at something, pick up something, go somewhere, check its stats, start a conversation...
                  */
-                attack: { //TODO: comments
+                attack: { // Deal damage to a target with a melee weapon
                     aliases: ["attack", "melee"],
                     expects: "",
                     fail: "auto",
                     code: (input) => {
                         let command = cf.carg(input, "", " ", ";");
-                        let attackType = Number(command.numbers[0]);
-                        let being = ut.partialMatch(command.regularWords.join(" "), beings.filter(b => b != this && b.room == this.room && b.subroom == this.subroom), ["name"]);
-                        if (!this.equipment.melee) {
+                        let attackType = Number(command.numbers[0]); // Get the first number from the message
+                        let being = ut.partialMatch(command.regularWords.join(" "), beings.filter(b => b != this && b.room == this.room && b.subroom == this.subroom), ["name"]); // Get a being matching words from the message
+                        if (!this.equipment.melee) { // If you don't have a weapon...
                             return "You charge at your foe, but quickly realise that you aren't going to do much damage without a weapon.";
-                        } else if (this.equipment.melee.tier > this.tiers[this.equipment.melee.attackType]) {
+                        } else if (this.equipment.melee.tier > this.tiers[this.equipment.melee.attackType]) { // If the weapon's tier is too high...
                             return "You attempt to raise your weapon, but suddenly it seems far too heavy to use. You can barely lift it from its container, let alone swing it.";
-                        } else {
-                            if (being) {
-                                return this.equipment.melee.attack(being, attackType);
-                            } else {
+                        } else { // If all is well...
+                            if (being) { // If you named something to attack...
+                                return this.equipment.melee.attack(being, attackType); // attack it.
+                            } else { // Didn't find anything to attack...
                                 return "You hacked and you slashed, but without a target your efforts were wasted.";
                             }
                         }
                     }
                 },
-                equip: {
+                equip: { // Equip a held item
                     aliases: ["equip"],
                     expects: "item",
                     fail: "auto",
-                    code: (item) => {
-                        console.log(item);
-                        let slot = item.item.attackType;
-                        if (this.equipment[slot]) {
+                    code: (item) => { //TODO: Change up the success/failure messages to something neater
+                        let slot = item.item.attackType; // Name of the slot that the item belongs in
+                        if (this.equipment[slot]) { // If that slot is filled...
                             return "You already have an item in the slot `"+slot+"`.";
-                        } else {
-                            this.inventory.splice(item.index, 1);
-                            this.equipment[slot] = item.item;
+                        } else { // Otherwise...
+                            this.inventory.splice(item.index, 1); // Remove the item from your inventory
+                            this.equipment[slot] = item.item; // Add the item to equipment
                             return "`"+item.item.name+"` was equipped into slot `"+slot+"`.";
                         }
                     }
                 },
-                go: {
+                go: { // Go to a room or subroom
                     aliases: ["go", "move"],
                     expects: "",
                     fail: "auto",
                     code: (input) => {
-                        let il = input.toLowerCase();
-                        let room = rooms[this.room];
-                        let exit = room.exits.find(r => r.direction.startsWith(il) || r.aliases.includes(il));
-                        let subroom = room.subrooms && ut.partialMatch(input, room.subrooms, ["location"]);
+                        let il = input.toLowerCase(); // il: Input Lowercase, so that I don't repeat myself
+                        let room = rooms[this.room]; // Details of the being's current room
+                        let exit = room.exits.find(r => r.direction.startsWith(il) || r.aliases.includes(il)); // Find an exit matching input
+                        let subroom = room.subrooms && ut.partialMatch(input, room.subrooms, ["location"]); // Find a subroom matching input
                         if (exit) { // Input was an exit
-                            // If already in exit subroom, just do it
-                            if (!exit.exit || exit.exit == this.subroom) {
-                                this.setLocation(exit.target, exit.entrance);
+                            if (!exit.exit || exit.exit == this.subroom) { // If already in exit subroom...
+                                this.setLocation(exit.target, exit.entrance); // go there!
                                 return this.actions.look.code();
-                            } else {
-                                return new Promise(resolve => {
+                            } else { // Otherwise...
+                                return new Promise(resolve => { // When the output function receives a promise, it will return the output of the promise's resolution.
                                     //console.log(rooms[exit.target].subrooms);
-                                    this.navigateSubroomsMenu(room.subrooms, exit.exit, game.channel, () => {
-                                        console.log("done");
-                                        this.setLocation(exit.target, exit.entrance);
-                                        resolve(this.actions.look.code());
+                                    this.navigateSubroomsMenu(room.subrooms, exit.exit, game.channel, () => { // Start a menu to get to the correct subroom
+                                        //console.log("done");
+                                        this.setLocation(exit.target, exit.entrance); // Once done, go through the exit,
+                                        resolve(this.actions.look.code()); // and finally resolve the promise.
                                     });
                                 });
                             }
@@ -316,7 +322,7 @@ module.exports = function(input) {
                         }
                     }
                 },
-                items: {
+                items: { // Show all inventory items
                     aliases: ["inventory", "items", "item"],
                     expects: "",
                     fail: "auto",
@@ -328,7 +334,7 @@ module.exports = function(input) {
                         }};
                     }
                 },
-                look: {
+                look: { //TODO: comments
                     aliases: ["look"],
                     expects: "being",
                     fail: "manual",
@@ -380,7 +386,9 @@ module.exports = function(input) {
                                                || "(none)"
                                     },{
                                         name: "Subrooms",
-                                        value: !!(room.subrooms && room.subrooms.length) //TODO: list tree of nearby subrooms
+                                        value: room.subrooms && room.subrooms.length
+                                            ? ut.subroomTree(room.subrooms, this.subroom, 3)
+                                            : "(none)"
                                     },{
                                         name: "Exits",
                                         value: room.exits.map(e => e.aliases.concat([e.direction]).join("/")).join("\n")
@@ -391,7 +399,7 @@ module.exports = function(input) {
                         }
                     }
                 },
-                stats: {
+                stats: { // duh.
                     aliases: ["stats"],
                     expects: "",
                     fail: "auto",
@@ -399,7 +407,7 @@ module.exports = function(input) {
                         return this.getStats();
                     }
                 },
-                take: {
+                take: { // Take an item
                     aliases: ["take"],
                     expects: "being",
                     fail: "auto",
@@ -415,7 +423,7 @@ module.exports = function(input) {
                         }
                     }
                 },
-                talk: {
+                talk: { // duh.
                     aliases: ["talk"],
                     expects: "being",
                     fail: "auto",
@@ -423,25 +431,25 @@ module.exports = function(input) {
                         return being.receivables.talk(this);
                     }
                 },
-                use: {
+                use: { // Use a held item or an object
                     aliases: ["use"],
                     expects: "being",
                     fail: "manual",
                     code: (input) => {
-                        if (typeof(input) == "string") {
-                            let item = this.getItem(input);
-                            if (item) {
-                                item = item.item;
-                                if (item.receivables.use) {
-                                    console.log(this);
-                                    return item.receivables.use(this);
+                        if (typeof(input) == "string") { // Not a being
+                            let item = this.getItem(input); // Figure out which item was mentioned
+                            if (item) { // If there was a match...
+                                item = item.item; // haha
+                                if (item.receivables.use) { // If it can be used...
+                                    //console.log(this);
+                                    return item.receivables.use(this); // use it.
                                 } else {
                                     return "You cannot use that item.";
                                 }
                             } else {
-                                return "You tried your hardest, but you couldn't figure out what to use.";
+                                return "You waved your hands in the air for a moment, but without something to wave at, nothing happened.";
                             }
-                        } else {
+                        } else { // A being
                             if (!input.receivables.use) {
                                 return "You cannot use that object.";
                             } else if (input.subroom != this.subroom) {
@@ -452,24 +460,24 @@ module.exports = function(input) {
                         }
                     }
                 },
-                unequip: {
+                unequip: { // Put a held item back in the inventory
                     aliases: ["unequip"],
                     expects: "",
                     fail: "auto",
                     code: (slot) => {
-                        if (!this.equipment[slot]) {
+                        if (this.equipment[slot] === null) { // whoa
                             return "There is no item in that slot.";
-                        } else if (["melee", "ranged", "magic"].includes(slot)) {
+                        } else if (this.equipment[slot] === undefined) { // another one? amazing
+                            return "That slot does not exist.";
+                        } else {
                             let item = this.equipment[slot];
                             this.inventory.push(this.equipment[slot]);
-                            this.equipment[slot] = undefined;
-                            return "Unequipped item `"+item.name+"` from slot `"+slot+"`.";
-                        } else {
-                            return "Couldn't find any equipment slots matching `"+slot+"`.";
+                            this.equipment[slot] = null;
+                            return "Unequipped item `"+item.name+"` from slot `"+slot+"`."; //TODO: Change this message
                         }
                     }
                 },
-                xyzzy: {
+                xyzzy: { // Don't forget to put an easter egg here in future
                     aliases: ["xyzzy"],
                     expects: "",
                     fail: "auto",
@@ -506,6 +514,8 @@ module.exports = function(input) {
         }
         navigateSubroomsMenu(subrooms, target, channelID, callback) { //TODO: make sure this can't be exploited by leaving it open (listen for event, then close menu)
             if (!callback) callback = new Function();
+            let pastMoves = [];
+            let cheatingDetected = false;
             let path = ut.findSubroomPath(subrooms, this.subroom, target); // use ut.findSubroomPath to figure out the route
             if (path) { // If a route was found...
                 path = [this.subroom].concat(path);
@@ -523,25 +533,41 @@ module.exports = function(input) {
                 let getCompleteMessage = (remaining) => { // a function which takes that path message and adds a little more info
                     return "Found path through subrooms:```\n"+getPathMessage(path, this.subroom)+"```"+(remaining ? " "+remaining+" moves left." : " Reached destination.");
                 }
-                bf.reactionMenu(channelID, getCompleteMessage(path.length-1), [ // reaction menus are hard to explain, so I won't :hippo:
+                bf.reactionMenu(channelID, getCompleteMessage(path.length-1), [ // reaction menu internals are hard to explain, so I won't :hippo:
                     {emoji: bf.buttons["tick"], remove: "all", ignore: "total", actionType: "js", actionData: (event) => {
-                        path.slice(1).forEach(p => { // For each point on the route,
-                            this.setLocation(undefined, p); // go there.
-                        });
-                        bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(0)); // edit the message to show completion
-                        callback(); // callback success
+                        if (!cheatingDetected) {
+                            path.slice(1).forEach(p => { // For each point on the route,
+                                pastMoves.push(p);
+                                this.setLocation(undefined, p); // go there.
+                            });
+                            bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(0)); // edit the message to show completion
+                            callback(); // callback success
+                        }
                     }},
                     {emoji: bf.buttons["down"], remove: "user", actionType: "js", actionData: (event) => {
-                        let nextIndex = path.indexOf(this.subroom)+1;
-                        this.setLocation(undefined, path[nextIndex]); // go the next point on the route
-                        let remaining = [...path].reverse().indexOf(this.subroom); // the number of remaining points on the route
-                        if (nextIndex == path.length-1) { // If you're at the destination...
-                            bot.removeAllReactions({channelID, messageID: event.d.message_id}); // remove all reactions on the message,
-                            setImmediate(callback); // and callback as soon as possible.
+                        if (!cheatingDetected) {
+                            let nextIndex = path.indexOf(this.subroom)+1;
+                            pastMoves.push(path[nextIndex]);
+                            this.setLocation(undefined, path[nextIndex]); // go the next point on the route
+                            let remaining = [...path].reverse().indexOf(this.subroom); // the number of remaining points on the route
+                            if (nextIndex == path.length-1) { // If you're at the destination...
+                                bot.removeAllReactions({channelID, messageID: event.d.message_id}); // remove all reactions on the message,
+                                setImmediate(callback); // and callback as soon as possible.
+                            }
+                            bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(remaining)); // edit the message to show progress
                         }
-                        bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(remaining)); // edit the message to show progress
                     }}
-                ]);
+                ], (err, id) => {
+                    notice.on("setLocation", (room, subroom, being) => {
+                        if (pastMoves.includes(subroom)) {
+                            pastMoves.splice(pastMoves.indexOf(subroom), 1);
+                        } else {
+                            cheatingDetected = true;
+                            bot.removeAllReactions({channelID, messageID: id});
+                            bf.editMessage(channelID, id, "Movement menu closed to prevent cheating.");
+                        }
+                    });
+                });
             } else { // If a route wasn't found...
                 bf.sendMessage(channelID, "Couldn't navigate from "+this.subroom+" to "+target+" through subrooms."); // just fail, without callback
             }
@@ -591,13 +617,16 @@ module.exports = function(input) {
              */
             Object.assign(this, {name, emoji: emoji || "❓", tier, type: "inventoryItem"}); // If no emoji was supplied, use a red question mark
             this.receivables = {
-                look: () => { //TODO
-                    return "InventoryItem look receivable";
+                look: () => {
+                    return {embed: {
+                        title: this.emoji+" "+this.name,
+                        description: "Default look receivable for generic items. Why isn't there a description specific to this subclass? ("+this.constructor.name+")",
+                    }};
                 },
                 inventoryLine: (emoji) => { // similar to summary, but only for display in one's inventory
                     return (emoji ? this.emoji+" " : "")+this.name+" (T:"+this.tier+")";
                 },
-                summary: () => { // WorldItem uses this
+                summary: () => { // similar to inventoryLine, but for display in lists of beings (etc); WorldItem uses this
                     return this.name+" (item)";
                 }
             }
@@ -649,11 +678,6 @@ module.exports = function(input) {
             } else { // If attackType is in range...
                 return this.attacks[attackType-1].code(target); // Perform the requested attack.
             }
-        }
-    }
-    Classes.RustySword = class RustySword extends Classes.MeleeWeapon { // Why does this exist? //TODO: remove maybe
-        constructor() {
-            super("Rusty sword", 1, 10);
         }
     }
     Classes.HealingItem = class HealingItem extends Classes.InventoryItem {

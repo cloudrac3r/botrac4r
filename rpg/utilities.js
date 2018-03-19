@@ -67,24 +67,26 @@ module.exports = {
         });
         // Convert to ASCII art
         //stage2 = "```\n"+stage1.map(t => "  ".repeat(t.depth)+t.location).join("\n")+"```";
-        let stage2 = "```\n"+stage1.map((t,i) => {
-            let prefix = "";
-            if (t.depth > 0) {
-                for (let i = 1; i < t.depth; i++) {
-                    if (!stage1.slice(i+1).find(u => u.depth == i)) {
-                        prefix += prefix = "┃ "; //SC: Box & en space
+        stage2 = "```\n"+stage1.map((branch,index) => {
+            let output = "";
+            for (let i = 0; i < branch.depth; i++) {
+                if (i < branch.depth-1) {
+                    if (stage1.slice(index+1, stage1.slice(index+1).findIndex(b => b.depth <= i+1)+index+2).find(b => b.depth == i+1)) {
+                        output += "│ ";
                     } else {
-                        prefix += prefix = "  "; //SC: Space & en space
+                        output += "  ";
+                    }
+                } else {
+                    if (stage1.slice(index+1, stage1.slice(index+1).findIndex(b => b.depth <= i+1)+index+2).find(b => b.depth == i+1)) {
+                        output += "├ ";
+                    } else {
+                        output += "└ ";
                     }
                 }
-                if (!stage1[i+1] || stage1[i+1].depth < t.depth) {
-                    prefix += "┗";
-                } else {
-                    prefix += "┣";
-                }
-                prefix += " ";
             }
-            return prefix+t.location;
+            output += branch.location;
+            //console.log(output);
+            return output;
         }).join("\n")+"```";
         return stage2;
     }
