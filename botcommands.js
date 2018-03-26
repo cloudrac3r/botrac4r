@@ -252,7 +252,7 @@ module.exports = function(input) {
                 }
                 let output = "Here is your flag. Fly it proudly. ✋😤\n"+template.replace(/\*/g, command.switches.blue).replace(/-/g, command.switches.red).replace(/ /g, command.switches.white);
                 bf.sendMessage(channelID, output, {mention: userID, characterLimit:
-                    "Unfortunately, that flag uses more than Discord's character limit of "+bf.messageCharacterLimit+" characters. Here's what you can do instead:\n"+
+                    "Unfortunately, that flag uses more than Discord's character limit of "+bf.messageCharacterLimit+" characters. Here's spme things you can do to get around this:\n"+
                     "• Decrease the size of the flag\n"+
                     "• Swap out some custom emojis in favour of regular emojis\n"+
                     "• Stop shitposting"

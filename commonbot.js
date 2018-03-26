@@ -3,6 +3,7 @@ module.exports = function(input) {
     let reactionMenus = {};
     let messageMenus = [];
     let availableFunctions = {
+        messageCharacterLimit: 2000,
         // Button reactions.
         buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
             // Numbers
@@ -188,10 +189,11 @@ module.exports = function(input) {
                             setTimeout(function() { // Try again after the timeout
                                 availableFunctions.sendMessage(channelID, message, callback, additional);
                             }, err.response.retry_after);
-                        } else if (err.response && typeof(err.response.content) == "string" && err.response.content.match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
+                        } else if (err.response && err.response.content && typeof(err.response.content[0]) == "string" && err.response.content[0].match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
                             if (additional.characterLimit) {
+                                let newMessage = additional.characterLimit;
                                 delete additional.characterLimit; // Prevent the error message from hitting the character limit again
-                                availableFunctions.sendMessage(channelID, additional.characterLimit, callback, additional);
+                                availableFunctions.sendMessage(channelID, newMessage, callback, additional);
                             } else {
                                 availableFunctions.sendMessage(channelID, "Oops. I didn't manage to send a message because it exceeded Discord's character limit. This was probably your fault.", callback, additional);
                                 cf.log("Message exceeded character limit", "warning");
