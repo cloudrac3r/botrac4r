@@ -1,5 +1,6 @@
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
+    const prettyMs = require("pretty-ms");
     let availableFunctions = {
         roll: {
             aliases: ["roll", "dice", "random", "rng"],
@@ -265,6 +266,15 @@ module.exports = function(input) {
             longHelp: "",
             code: function(userID, channelID, command, d) {
                 bf.sendMessage(channelID, "You can use this link to add "+bot.username+" to any server: <https://discordapp.com/oauth2/authorize?client_id=353703396483661824&scope=bot>\nTo work properly, it will need additional permissions. Giving it Administrator will give it all the permissions it needs.");
+            }
+        },
+        "uptime": {
+            aliases: ["uptime", "stats"],
+            shortHelp: "See how long the bot has been running",
+            reference: "",
+            longHelp: "This time is reset whenever the bot goes offline and comes back online, or a full restart is performed (this is silent).",
+            code: function(userID, channelID, command, d) {
+                bf.sendMessage(channelID, "Bot uptime: "+prettyMs(process.uptime()*1000), {mention: userID});
             }
         },
         "vote": {
