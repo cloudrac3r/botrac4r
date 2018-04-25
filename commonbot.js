@@ -1,7 +1,47 @@
+const userEmojiMessage = {channelID: "434994415342321674", messageID: "434994502848217099"};
+
 module.exports = function(input) {
-    let {bot, cf, db} = input;
+    let {bot, cf, db, reloadEvent} = input;
+    let userEmojis = {};
     let reactionMenus = {};
     let messageMenus = [];
+
+    if (bot.connected) {
+        bot.on("messageUpdate", editHandler);
+        updateUserEmojis();
+    } else {
+        bot.once("allUsers", function() {
+            updateUserEmojis();
+            bot.on("messageUpdate", editHandler);
+        });
+    }
+    reloadEvent.once(__filename, function() {
+        bot.removeListener("messageUpdate", editHandler);
+    });
+    function editHandler(NUL, event) {
+        if (event && event.d) {
+            if (event.d.channel_id == userEmojiMessage.channelID && event.d.message_id == userEmojiMessage.messageID) {
+                updateUserEmojis(event.d.content);
+            }
+        }
+    }
+    function updateUserEmojis(message) {
+        new Promise(resolve => {
+            if (message) resolve;
+            else {
+                bot.getMessage(userEmojiMessage, (err, res) => {
+                    message = res.content;
+                    resolve();
+                });
+            }
+        }).then(() => {
+            message.split("\n").forEach(line => {
+                let [userID, emoji] = line.split(" ");
+                userEmojis[userID] = emoji;
+            });
+        });
+    }
+
     let availableFunctions = {
         messageCharacterLimit: 2000,
         // Button reactions.
@@ -44,46 +84,6 @@ module.exports = function(input) {
             "green tick": "✅",
             "green cross": "❎"
         },
-        userEmojis: {
-            "112767329347104768": "00",
-            "114849691241283591": "01",
-            "112890272819507200": "02",
-            "235876818656296960": "03",
-            "113852329832218627": "04",
-            "134826546694193153": "05",
-            "113442380811649024": "06",
-            "103846931398148096": "07",
-            "113457314106740736": "08",
-            "112816036671184896": "09",
-            "117749297562255364": "10",
-            "97566343791927296": "11",
-            "176580265294954507": "12",
-            "309960863526289408": "13",
-            "113340068197859328": "14",
-            "208304366719860737": "15",
-            "248169612980518912": "16",
-            "112760500130975744": "17",
-            "270264131523837952": "18",
-            "115273199461203968": "19",
-            "123171411358515200": "20",
-            "104867073343127552": "21",
-            "114557048678514693": "22",
-            "111604486476181504": "23",
-            "238459957811478529": "24",
-            "117661708092309509": "25",
-            "112764060835012608": "26",
-            "112762265362513920": "27",
-            "114147806469554185": "28",
-            "116718249567059974": "29",
-            "112814914019614720": "30",
-            "114412498307776512": "31",
-            "112770767745265664": "32",
-            "113671556835573768": "33",
-            "277449474476081153": "34",
-            "100735237184561152": "35",
-            "353176789318762499": "36",
-            "139941520324296704": "37",
-        },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
             if (!bot.users[userID]) return "(unknown user: "+userID+")";
@@ -109,13 +109,7 @@ module.exports = function(input) {
         // Given a userID, return the custom emoji representing the user
         userIDToEmoji: function(userID, notFound) {
             if (!notFound) notFound = "";
-            let emojiServer = bot.servers["367399615621758976"];
-            let emojiName = availableFunctions.userEmojis[userID];
-            if (!emojiName || !emojiServer || !emojiServer.emojis) {
-                return notFound;
-            } else {
-                return "<:"+emojiName+":"+Object.keys(emojiServer.emojis).find(e => emojiServer.emojis[e].name == emojiName)+">";
-            }
+            return userEmojis[userID] || notFound;
         },
         // Given a userID or channelID, return its display name.
         nameOfChannel: function(channelID) {
@@ -623,26 +617,28 @@ module.exports = function(input) {
                         delete reactionMenus[event.d.message_id];
                         break;
                     }
-                }
-                switch (action.remove) { // Sometimes remove certain emojis after being clicked
-                case "user": // Remove the user's reaction only
-                    availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id);
-                    break;
-                case "bot": // Remove the bot's reaction that the user matched
-                    availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, bot.id);
-                    break;
-                case "that": // Remove everyone's reactions that the user matched
-                    availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, [action.emoji]);
-                    break;
-                case "menu": // Remove all reactions belonging to that menu
-                    availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji));
-                    break;
-                case "all": // Remove all reactions on that message
-                    bot.removeAllReactions({channelID: event.d.channel_id, messageID: event.d.message_id});
-                    break;
-                case "message": // Delete the message containing the menu reactions
-                    bot.deleteMessage({channelID: event.d.channel_id, messageID: event.d.message_id});
-                    break;
+                    switch (action.remove) { // Sometimes remove certain emojis after being clicked
+                    case "user": // Remove the user's reaction only
+                        availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id);
+                        break;
+                    case "bot": // Remove the bot's reaction that the user matched
+                        availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, bot.id);
+                        break;
+                    case "that": // Remove everyone's reactions that the user matched
+                        availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, [action.emoji]);
+                        break;
+                    case "menu": // Remove all reactions belonging to that menu
+                        availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji));
+                        break;
+                    case "all": // Remove all reactions on that message
+                        bot.removeAllReactions({channelID: event.d.channel_id, messageID: event.d.message_id});
+                        break;
+                    case "message": // Delete the message containing the menu reactions
+                        bot.deleteMessage({channelID: event.d.channel_id, messageID: event.d.message_id});
+                        break;
+                    }
+                } else if (action.remove == "user") { // If the user is not allowed, but their reaction should be removed
+                    availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id); // Remove it.
                 }
             });
         }
