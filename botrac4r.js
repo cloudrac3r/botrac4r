@@ -45,6 +45,12 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/rpg/main.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/images.js",
+        dest: "bot commands"
+    },{
+        filename: __dirname+"/spoiler.js",
+        dest: "bot commands"
     }
 ];
 

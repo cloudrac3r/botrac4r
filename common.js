@@ -2,7 +2,7 @@ module.exports = {
     // Log a message to console with a prefix
     log: function(text, severity) {
         let prefixes = {"error": "[#]", "warning": "[!]", "info": "[.]", "spam": "[ ]", "unknown": "[?]", "responseInfo": "( )", "responseError": "(!)"}; // Names and types of logging
-        text = module.exports.stringify(text);
+        text = module.exports.stringify(text, true);
         let prefix = (prefixes[severity] || prefixes.unknown)+" ["+module.exports.getSixTime()+"] ";
         text = text.replace(/\n/g, "\n"+prefix.replace(/([[(]).([\])])/, "$1^$2")); // Deal with newlines (prefix each line)
         console.log(prefix+text);
