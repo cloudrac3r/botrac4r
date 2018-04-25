@@ -39,7 +39,7 @@ module.exports = function(input) {
                         bot.getPinnedMessages({channelID: channelID}, function(e,a) {
                             if (e && e.statusCode == 429) {
                                 setTimeout(gpm, e.response.retry_after);
-                            } else {
+                            } else if (a && a[0]) {
                                 bot.getMessage({channelID: channelID, messageID: a[0].id}, function(e,r) {
                                     r.attachments.push({});
                                     r.embeds.push({});
@@ -79,6 +79,8 @@ module.exports = function(input) {
                                         bot.deletePinnedMessage({channelID: channelID, messageID: toRemove});
                                     }
                                 }
+                            } else {
+                                bf.sendMessage(channelID, "oof");
                             }
                         });
                     }
@@ -113,7 +115,7 @@ module.exports = function(input) {
             if (target) {
                 bot.getMessages({channelID: target}, function(e,a) {
                     a.filter(m => m.author.id == bot.id)
-                    .filter(m => m.embeds[0] || m.embeds[0].type == "rich")
+                    .filter(m => m.embeds[0] && m.embeds[0].type == "rich")
                     .forEach(m => {
                         if (m.embeds[0].footer.text.match(/^.+ \| [0-9]{18,} \| pinned by .+$/)) {
                             let pinner = Object.keys(bot.users).find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == bot.users[u].username);
