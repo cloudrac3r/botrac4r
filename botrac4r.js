@@ -51,6 +51,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/spoiler.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/remind.js",
+        dest: "bot commands"
     }
 ];
 
