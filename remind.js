@@ -13,7 +13,30 @@ module.exports = function(input) {
 
     function addReminder(reminder) {
         timers.push(setTimeout(() => {
-            bf.sendMessage(reminder.channelID, `<@${reminder.userID}> Ping! ${reminder.textTime} ago, you asked me to remind you about this:\n${reminder.text}`);
+            let text = `<@${reminder.userID}> Ping! ${reminder.textTime} ago, `;
+            if (reminder.text) text += `you asked me to remind you about this:\n${reminder.text}`;
+            else text += `you set a reminder. Press ${bf.buttons["up"]} to pin the original message so you can jump back there.`;
+            bf.reactionMenu(reminder.channelID, text, [
+                {emoji: bf.buttons["up"], remove: "user", actionType: "js", actionData: () => {
+                    let messageObject = {channelID: reminder.channelID, messageID: reminder.messageID};
+                    reloadEvent.emit("pinarchive ignore", messageObject);
+                    bot.pinMessage(messageObject, (err) => {
+                        if (err) {
+                            cf.log(`Couldn't pin reminder message (${reminder.messageID}) for jumping:\n${JSON.stringify(err, null, 4)}`, "error");
+                        } else {
+                            cf.log(`Pinned reminder message (${reminder.messageID}) for jumping`, "spam");
+                            setTimeout(() => {
+                                bot.deletePinnedMessage(messageObject);
+                                bot.getMessages({channelID: reminder.channelID}, (err, arr) => {
+                                    if (err) throw err;
+                                    let pinIndicator = arr.find(m => m.type == 6 && m.author.id == bot.id);
+                                    if (pinIndicator) bot.deleteMessage({channelID: reminder.channelID, messageID: pinIndicator.id});
+                                });
+                            }, 6*1000);
+                        }
+                    });
+                }}
+            ]);
             db.run("DELETE FROM Reminders WHERE id=?", reminder.id);
         }, reminder.time-Date.now()));
     }
@@ -50,10 +73,10 @@ module.exports = function(input) {
                 }
                 if (valid) {
                     let receiveChannel = bot.directMessages[channelID] ? userID : channelID;
-                    db.run("INSERT INTO Reminders VALUES (NULL, ?, ?, ?, ?, ?)", [userID, receiveChannel, words.join(command.split), time, textTime.join(" ")], err => {
+                    db.run("INSERT INTO Reminders VALUES (NULL, ?, ?, ?, ?, ?, ?)", [userID, receiveChannel, d.id, words.join(command.split), time, textTime.join(" ")], err => {
                         db.get("SELECT seq FROM sqlite_sequence WHERE name='Reminders'", (err, dbr) => {
                             if (err) throw err;
-                            addReminder({userID, channelID, text: words.join(command.split), time, id: dbr.seq, textTime: textTime.join(" ")});
+                            addReminder({userID, channelID, messageID: d.id, text: words.join(command.split), time, id: dbr.seq, textTime: textTime.join(" ")});
                             bf.addReaction(channelID, d.id, bf.buttons["green tick"]);
                         });
                     });
