@@ -5,12 +5,16 @@ module.exports = function(input) {
     let channelPinsUpdate = {};
     let messageUpdate = {};
     let selfUnpin = [];
+    let ignoredMessages = [];
     let unpinTimeout = 1000;
     bot.on("message", messageEvent);
     bot.on("any", messageUpdateEvent);
     reloadEvent.once(__filename, function() {
         bot.removeListener("message", messageEvent);
         bot.removeListener("any", messageUpdateEvent);
+    });
+    reloadEvent.on("pinarchive ignore", info => {
+        ignoredMessages.push(info);
     });
     function getPinChannel(channelID, callback) {
         pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channels[channelID].guild_id, function(err, dbr) {
@@ -30,14 +34,15 @@ module.exports = function(input) {
         });
     }
     function messageEvent(user, userID, channelID, message, event) {
-        if (event.d.type == 6) {
+        if (event.d.type == 6 && bot.channels[channelID]) {
             getPinChannel(channelID, function(target, dbr, cdbr) {
                 if (target) {
                     cf.log("Pin posting", "info");
                     gpm();
                     function gpm() {
                         bot.getPinnedMessages({channelID: channelID}, function(e,a) {
-                            if (e && e.statusCode == 429) {
+                            if (ignoredMessages.find(m => m.messageID == a[0].id && m.channelID == a[0].channel_id)) return;
+                            else if (e && e.statusCode == 429) {
                                 setTimeout(gpm, e.response.retry_after);
                             } else if (a && a[0]) {
                                 bot.getMessage({channelID: channelID, messageID: a[0].id}, function(e,r) {
@@ -110,6 +115,7 @@ module.exports = function(input) {
         }
     }
     function somethingWasUnpinned(channelID, latestTimestamp, messageID) {
+        if (!bot.channels[channelID]) return;
         cf.log("Something unpinned", "info");
         getPinChannel(channelID, function(target) {
             if (target) {
