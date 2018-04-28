@@ -1,4 +1,35 @@
 module.exports = {
+    "bedroom": {
+        start: "welcome",
+        list: {
+            "welcome": {
+                text: "As you enter the bedroom, you feel a strange chill curl around your ankles, in contrast to the warmth of the fire burning "+
+                      "in the fireplace. Something is not right here.",
+                options: [
+                    {
+                        name: "(ok)",
+                        route: "END"
+                    },
+                    {
+                        name: "wait what's that",
+                        route: "sword",
+                        code: (i) => {
+                            new i.Classes.WorldItem(new i.Classes.MeleeWeapon("Shiny sword", 15, 1), "start/bedroom", "", false);
+                        }
+                    }
+                ]
+            },
+            "sword": {
+                text: "Where did that sword come from? You don't remember it being there when you left the room.",
+                options: [
+                    {
+                        name: "(ok)",
+                        route: "END"
+                    }
+                ]
+            }
+        },
+    },
     "test1": {
         start: "welcome",
         list: {

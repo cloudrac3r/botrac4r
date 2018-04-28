@@ -129,12 +129,7 @@ module.exports = function(input) {
                 hurt: (damage) => { // hurt a certain amount of HP, and kill being if it reaches or passes zero
                     this.stats.hp -= damage;
                     if (this.stats.hp <= 0) {
-                        beings.splice(beings.map((o,i) => ({o,i})).find(o => o.o == this).i, 1);
-                        bot.sendMessage({to: game.channel, embed: {
-                            author: this.embedAuthor(),
-                            title: "Died.",
-                            color: 0xdd1d1d
-                        }});
+                        this.die();
                     }
                 },
                 talk: (caller) => { // start an interactive dialogue, see the startDialogue method
@@ -165,6 +160,16 @@ module.exports = function(input) {
                 magic: null
             };
         }
+        die(silently) {
+            beings.splice(beings.map((o,i) => ({o,i})).find(o => o.o == this).i, 1);
+            if (!silently) {
+                bot.sendMessage({to: game.channel, embed: {
+                    author: this.embedAuthor(),
+                    title: "Died.",
+                    color: 0xdd1d1d
+                }});
+            }
+        }
         embedAuthor() { // return name and avatar for display as author of an embed
             return {
                 name: this.fullName || this.name, // if you haven't seen the || operator before, it returns the first thing, but if there is no first thing, it moves on to the next thing
@@ -177,7 +182,7 @@ module.exports = function(input) {
                 {position: 2, path: ["item", "constructor", "name"], code: (input, item) => (input.toLowerCase() == item.toLowerCase)}
             ]);
         }
-        startDialogue(talkID, caller) {
+        startDialogue(talkID, caller, callback) {
             let q = di[talkID];
             let current = q.start;
             let mid;
@@ -228,6 +233,7 @@ module.exports = function(input) {
                 }
                 if (choice.route == "END") { // If you reached the end...
                     bot.removeAllReactions({channelID: game.channel, messageID: mid}); // remove all buttons.
+                    callback(); // we're done!
                 }
                 showNextBox(); // Something changed, so update the display
             }
@@ -299,21 +305,34 @@ module.exports = function(input) {
                         let il = input.toLowerCase(); // il: Input Lowercase, so that I don't repeat myself
                         let room = rooms[this.room]; // Details of the being's current room
                         let exit = room.exits.find(r => r.direction.startsWith(il) || r.aliases.includes(il)); // Find an exit matching input
+                        let target = rooms[exit.target];
                         let subroom = room.subrooms && ut.partialMatch(input, room.subrooms, ["location"]); // Find a subroom matching input
                         if (exit) { // Input was an exit
-                            if (!exit.exit || exit.exit == this.subroom) { // If already in exit subroom...
-                                this.setLocation(exit.target, exit.entrance); // go there!
-                                return this.actions.look.code();
-                            } else { // Otherwise...
-                                return new Promise(resolve => { // When the output function receives a promise, it will return the output of the promise's resolution.
-                                    //console.log(rooms[exit.target].subrooms);
-                                    this.navigateSubroomsMenu(room.subrooms, exit.exit, game.channel, () => { // Start a menu to get to the correct subroom
-                                        //console.log("done");
-                                        this.setLocation(exit.target, exit.entrance); // Once done, go through the exit,
-                                        resolve(this.actions.look.code()); // and finally resolve the promise.
-                                    });
+                            return new Promise(resolve => { // When the output function receives a promise, it will return the output of the promise's resolution.
+                                new Promise(cutscene => { // nested promises?! oof. please pretend this is a helpful comment and you know exactly what is going on.
+                                    if (!exit.exit || exit.exit == this.subroom) { // If already in exit subroom...
+                                        this.setLocation(exit.target, exit.entrance); // go there!
+                                        cutscene(); // Move on to the shared cutscene code
+                                    } else { // Otherwise...
+                                        //console.log(rooms[exit.target].subrooms);
+                                        this.navigateSubroomsMenu(room.subrooms, exit.exit, game.channel, () => { // Start a menu to get to the correct subroom
+                                            //console.log("done");
+                                            this.setLocation(exit.target, exit.entrance); // Once done, go through the exit,
+                                            cutscene(); // and move on to the shared cutscene code
+                                        });
+                                    }
+                                }).then(() => { // Check for and manage cutscenes
+                                    if (target.talkID) {
+                                        let cutsceneBeing = new Classes.Being(target.location.join(" / "),); // Create a temporary being to control the cutscene.
+                                        cutsceneBeing.startDialogue(target.talkID, this, () => {
+                                            cutsceneBeing.die(true); // Once done talking, we don't need it anymore.
+                                        });
+                                        resolve("`"); // No other output needed
+                                    } else {
+                                        resolve(this.actions.look.code()); // No cutscene available, so just resolve. Done!
+                                    }
                                 });
-                            }
+                            });
                         } else if (subroom) { // Input was a subroom
                             this.navigateSubroomsMenu(room.subrooms, subroom.location, game.channel);
                             return "`";

@@ -9,6 +9,7 @@ module.exports = {
                 exit: ""
             }
         ],
+        talkID: "bedroom",
         location: ["K'velin", "Castle", "Bedroom"],
         description:
             "You are in the bedroom of a castle. A door to the south leads to a hallway."
