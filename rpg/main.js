@@ -286,7 +286,7 @@ module.exports = function(input) {
         saveGame();
     }
     loadGame(() => {
-        bot.on("messageCreate", messageEvent);
+        bot.on("messageCreate", messageEvent); //TODO: Change to Eris
     });
     reloadEvent.once(__filename, () => {
         bot.removeListener("messageCreate", messageEvent);

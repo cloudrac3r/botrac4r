@@ -30,10 +30,10 @@ let modules = [ // Load these modules on startup and on change
     },{/*
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
-    },{*/
+    },{
         filename: __dirname+"/beans/beans.js",
         dest: "bot commands"
-    },{
+    },{*/
         filename: __dirname+"/names.js",
         dest: "bot framework"
     },{
@@ -138,8 +138,7 @@ bot.once("ready", function() { // Once the bot connects
     log(`Logged in as ${bot.user.username} (${bot.user.id})`, "info");
 });
 
-bot.on("messageCreate", function(messageObject) {
-    let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+bot.on("legacyMessage", function(user, userID, channelID, message, event) {
     if (!bot.users.get(userID)) return; // Ignore "fake users"
     if (bot.users.get(userID).bot) return; // Ignore other bots
     if (message == defaultPrefix+"configure") {
@@ -176,7 +175,7 @@ bot.on("messageCreate", function(messageObject) {
                                               `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
                                               (target.longHelp ? "\n\n"+target.longHelp : ""));
                 } else {
-                    if (!bot.directMessages[channelID]) bf.sendMessage(channelID, "DM sent.");
+                    if (!bot.isDMChannel(channelID)) bf.sendMessage(channelID, "DM sent.");
                     bf.sendMessage(userID, bot.username+" uses things called *flags* and *switches*. "+
                                            "These are to make it easier for you to specify options in your command without having to remember which order the options must be given in.\n"+
                                            "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a feature.\n"+

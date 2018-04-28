@@ -1,3 +1,4 @@
+const events = require("events");
 const userEmojiMessage = {channelID: "434994415342321674", messageID: "434994502848217099"};
 
 module.exports = function(input) {
@@ -6,7 +7,7 @@ module.exports = function(input) {
     let reactionMenus = {};
     let messageMenus = [];
 
-    let availableFunctions = {
+    let bf = {
         messageCharacterLimit: 2000,
         // Button reactions.
         buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
@@ -82,14 +83,14 @@ module.exports = function(input) {
             let channelName = "an unnamed channel";
             if (bot.users.get(channelID)) {
                 channelName = "@"+bot.users.get(channelID).username;
-            } else if (bot.directMessages[channelID]) {
-                /*if (bot.directMessages[channelID].recipients) { // Using LC's lib
-                    channelName = "@"+bot.directMessages[channelID].recipients[0].username;
+            } else if (bot.isDMChannel[channelID]) {
+                /*if (bot.isDMChannel(channelID).recipients) { // Using LC's lib
+                    channelName = "@"+bot.isDMChannel(channelID).recipients[0].username;
                 } else { // Not using LC's lib*/
-                    channelName = "@"+bot.directMessages[channelID].recipient.username;
+                    channelName = "@"+bot.getChannel(channelID).recipient.username;
                 /*}*/
             } else {
-                channelName = "#"+bot.channels.get(channelID).name;
+                channelName = "#"+bot.getChannel(channelID).name;
             }
             return channelName;
         },
@@ -112,11 +113,20 @@ module.exports = function(input) {
                 messageID = channelID.messageID;
                 channelID = channelID.channelID;
             }
-            let promise = bot.getMessage(channelID, messageID);
-            promise.then(messageObject => {
-                callback(null, messageObject);
-            });
-            return promise;
+            let cheat = bot.getChannel(channelID).messages.get(messageID);
+            if (cheat) {
+                callback(null, cheat);
+                return new Promise(resolve => {
+                    resolve(cheat);
+                });
+            } else {
+                let promise = bot.getMessage(channelID, messageID);
+                promise.then(messageObject => {
+                    bot.getChannel(channelID).messages.add(messageObject, undefined, true);
+                    callback(null, messageObject);
+                });
+                return promise;
+            }
         },
         // Send a message to a channel.
         sendMessage: function(channelID, message, callback, additional) {
@@ -142,7 +152,7 @@ module.exports = function(input) {
                     message = JSON.stringify(message);
                 }
             }
-            new Promise(function(resolve, reject) {
+            return new Promise(function(resolve, reject) {
                 if (additional.mention) {
                     db.get("SELECT mention FROM Users WHERE userID = ?", additional.mention, function(err, dbr) {
                         if (dbr && dbr.mention == 1) {
@@ -155,20 +165,32 @@ module.exports = function(input) {
                     resolve();
                 }
             }).then(function() {
-                bot.sendMessage(Object.assign({to: channelID, message: message}, additional), function(err, res) { // Actually send the message
+                let promise = bot.createMessage(channelID, Object.assign({content: message, additional}));
+                promise.then(messageObject => { // Actually send the message
+                    if (message) {
+                        cf.log(`Sent a message to ${bf.nameOfChannel(channelID)} (${channelID}): ${message} (${messageObject.id})`, "spam");
+                    } else {
+                        cf.log(`Sent a message to ${bf.nameOfChannel(channelID)} (${channelID}).`, "spam");
+                    }
+                    if (additional.legacy) callback(null, messageObject.id, messageObject);
+                    else callback(null, messageObject);
+                });
+                promise.catch(console.log);
+                return promise;
+                /*
                     if (err) { // Handle various errors
                         if (err.statusMessage == "TOO MANY REQUESTS") { // Rate limit
                             cf.log("Message blocked by rate limit, retrying in "+err.response.retry_after, "info");
                             setTimeout(function() { // Try again after the timeout
-                                availableFunctions.sendMessage(channelID, message, callback, additional);
+                                bf.sendMessage(channelID, message, callback, additional);
                             }, err.response.retry_after);
                         } else if (err.response && err.response.content && typeof(err.response.content[0]) == "string" && err.response.content[0].match(/^Must be [1-9][0-9]* or fewer in length.$/)) { // Character limit
                             if (additional.characterLimit) {
                                 let newMessage = additional.characterLimit;
                                 delete additional.characterLimit; // Prevent the error message from hitting the character limit again
-                                availableFunctions.sendMessage(channelID, newMessage, callback, additional);
+                                bf.sendMessage(channelID, newMessage, callback, additional);
                             } else {
-                                availableFunctions.sendMessage(channelID, "Oops. I didn't manage to send a message because it exceeded Discord's character limit. This was probably your fault.", callback, additional);
+                                bf.sendMessage(channelID, "Oops. I didn't manage to send a message because it exceeded Discord's character limit. This was probably your fault.", callback, additional);
                                 cf.log("Message exceeded character limit", "warning");
                             }
                         } else if (err.response.message == "Missing Access") {
@@ -178,14 +200,9 @@ module.exports = function(input) {
                             callback(err);
                         }
                     } else { // Success
-                        if (additional.embed) {
-                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}).`, "spam"); // Log information about what happened
-                        } else {
-                            cf.log(`Sent a message to ${availableFunctions.nameOfChannel(channelID)} (${channelID}): ${message} (${res.id})`, "spam");
-                        }
-                        callback(err, res.id, res);
+
                     }
-                });
+                });*/
             });
         },
         // Edit a message sent by the bot.
@@ -204,7 +221,11 @@ module.exports = function(input) {
                 return;
             }
             if (!callback) callback = new Function();
-            bot.editMessage(Object.assign({channelID: channelID, messageID: messageID, message: message}, additional), function(err, res) {
+            bot.editMessage(channelID, messageID, message).then(res => {
+                cf.log(`Edited a message in ${bf.nameOfChannel(channelID)} (${channelID}) to: ${message}`, "spam"); // Log information about what happened
+                callback(err);
+            });
+            /*
                 if (err) {
                     if (err.statusCode == 50005) { // Sent by another user
                         cf.log("Message was sent by another user and cannot be edited", "info");
@@ -213,20 +234,17 @@ module.exports = function(input) {
                         cf.log(cf.stringify(err, true), "error");
                         callback(err);
                     }
-                } else {
-                    cf.log(`Edited a message in ${availableFunctions.nameOfChannel(channelID)} (${channelID}) to: ${message}`, "spam"); // Log information about what happened
-                    callback(err);
                 }
-            });
+            */
         },
         // React to a message.
-        addReaction: function(channelID, messageID, reaction, callback, RSRBcheck) {
+        addReaction: function(channelID, message, reaction, callback, RSRBcheck) { //TODO: rewrite entire function: bot.addMessageReaction
             if (!channelID) {
                 cf.log("Need a channelID to react in", "warning");
                 return;
             }
-            if (!messageID) {
-                cf.log("Need a messageID to react to", "warning");
+            if (!message) {
+                cf.log("Need a message to react to", "warning");
                 return;
             }
             if (!reaction) {
@@ -234,40 +252,39 @@ module.exports = function(input) {
                 return;
             }
             if (!callback) callback = new Function();
-            reaction = availableFunctions.emojiToObject(reaction); // Convert emoji strings to objects
-            new Promise(function(resolve, reject) {
-                if (!RSRBcheck) {
-                    resolve();
-                } else {
-                    bot.getMessage({channelID: channelID, messageID: messageID}, function(err, res) { if (!err) {
+            reaction = bf.emojiToObject(reaction); // Convert emoji strings to objects
+            new Promise(resolve => {
+                if (typeof(message) == "string") {
+                    bf.getMessage(channelID, messageID).then(res => {
                         //cf.log(res.author.id);
                         if (res.author.id == "309960863526289408") { // Don't add reactions to messages from RSRB
                             cf.log(`Skipping reacting to ${res.author.username} with ${reaction}`, "warning");
                             callback("RSRB");
-                            reject();
+                            return;
                         } else {
-                            resolve();
+                            resolve(res);
                         }
-                    }});
-                }
-            }).then(function() {
-                bot.addReaction({channelID: channelID, messageID: messageID, reaction: reaction}, function(err, res) {
+                    });
+                } else resolve(message);
+            }).then(messageObject => {
+                messageObject.addReaction(reaction).then(() => {
+                    cf.log(`Added the reaction ${reaction} to a message (${messageObject.id}) in ${bf.nameOfChannel(channelID)} (${channelID})`, "spam");
+                    callback(null);
+                });
+                /*
                     if (err) {
                         if (err.statusMessage == "TOO MANY REQUESTS") {
                             cf.log("Reaction blocked by rate limit, retrying in "+err.response.retry_after, "spam");
                             setTimeout(function() {
-                                availableFunctions.addReaction(channelID, messageID, reaction, callback);
+                                bf.addReaction(channelID, messageID, reaction, callback);
                             }, err.response.retry_after);
                         } else {
                             cf.log(`${channelID}, ${messageID}, ${cf.stringify(reaction)}`, "error");
                             cf.log(cf.stringify(err, true), "error");
                             callback(err);
                         }
-                    } else {
-                        cf.log(`Added the reaction ${reaction} to a message (${messageID}) in ${availableFunctions.nameOfChannel(channelID)} (${channelID})`, "spam");
-                        callback(err, res);
                     }
-                });
+                */
             });
         },
         // Add multiple reactions to a message, in order.
@@ -287,7 +304,7 @@ module.exports = function(input) {
             if (!callback) callback = new Function();
             function addNextReaction() {
                 if (reactions.length > 0) {
-                    availableFunctions.addReaction(channelID, messageID, reactions.shift(), addNextReaction);
+                    bf.addReaction(channelID, messageID, reactions.shift(), addNextReaction);
                 } else {
                     callback();
                 }
@@ -308,15 +325,15 @@ module.exports = function(input) {
                 cf.log("Need a reaction to remove", "warning");
                 return;
             }
-            if (!userID) userID = bot.id;
+            if (!userID) userID = bot.user.id;
             if (!callback) callback = new Function();
-            reaction = availableFunctions.emojiToObject(reaction); // Convert emoji strings to objects
+            reaction = bf.emojiToObject(reaction); // Convert emoji strings to objects
             bot.removeReaction({channelID: channelID, messageID: messageID, reaction: reaction, userID: userID}, function(err, res) {
                 if (err) {
                     if (err.statusMessage == "TOO MANY REQUESTS") {
                         cf.log("Reaction removal blocked by rate limit, retrying in "+err.response.retry_after, "spam");
                         setTimeout(function() {
-                            availableFunctions.removeReaction(channelID, messageID, reaction, userID, callback);
+                            bf.removeReaction(channelID, messageID, reaction, userID, callback);
                         }, err.response.retry_after);
                     } else {
                         //cf.log(`${channelID}, ${messageID}, ${cf.stringify(reaction)}`, "error");
@@ -324,7 +341,7 @@ module.exports = function(input) {
                         callback(err);
                     }
                 } else {
-                    cf.log(`Removed the reaction ${reaction} from a message (${messageID}) in ${availableFunctions.nameOfChannel(channelID)} (${channelID})`, "spam");
+                    cf.log(`Removed the reaction ${reaction} from a message (${messageID}) in ${bf.nameOfChannel(channelID)} (${channelID})`, "spam");
                     callback(err, res);
                 }
             });
@@ -343,7 +360,7 @@ module.exports = function(input) {
                 cf.log("Need some reactions to remove", "warning");
                 return;
             }
-            reactions = reactions.map(r => availableFunctions.emojiToObject(r));
+            reactions = reactions.map(r => bf.emojiToObject(r));
             function userIncludeFunction(userID) {
                 if (users) return users.includes(userID);
                 else return true;
@@ -354,13 +371,13 @@ module.exports = function(input) {
                 if (err) {
                     cf.log(cf.stringify(err, true), "error");
                 } else {
-                    res.reactions.filter(re => reactions.some(ar => cf.slimMatch([ar, availableFunctions.emojiToObject(re.emoji)]) || ar == re.emoji.name)).forEach(re => bot.getReaction({channelID: channelID, messageID: messageID, reaction: availableFunctions.emojiToObject(re.emoji)}, function(err, res) {
+                    res.reactions.filter(re => reactions.some(ar => cf.slimMatch([ar, bf.emojiToObject(re.emoji)]) || ar == re.emoji.name)).forEach(re => bot.getReaction({channelID: channelID, messageID: messageID, reaction: bf.emojiToObject(re.emoji)}, function(err, res) {
                         res.map(u => u.id).filter(id => userIncludeFunction(id)).forEach(id => {
                             remaining++;
-                            availableFunctions.removeReaction(channelID, messageID, availableFunctions.emojiToObject(re.emoji), id, function() {
+                            bf.removeReaction(channelID, messageID, bf.emojiToObject(re.emoji), id, function() {
                                 if (!--remaining) callback();
                             });
-                            //cf.log("Now removing "+availableFunctions.emojiToObject(re.emoji)+channelID+messageID+id);
+                            //cf.log("Now removing "+bf.emojiToObject(re.emoji)+channelID+messageID+id);
                         });
                     }));
                 }
@@ -411,12 +428,12 @@ module.exports = function(input) {
                     }
                 }).then(function() {
                     if (!isID) {
-                        availableFunctions.sendMessage(channelID, message, function(err, messageID, res) {
-                            if (messageID) {
-                                availableFunctions.addReactions(channelID, messageID, actions.map(a => a.emoji), function() {
-                                    callback(err, messageID, res);
+                        bf.sendMessage(channelID, message, function(err, res) {
+                            if (res) {
+                                bf.addReactions(channelID, res, actions.map(a => a.emoji), function() {
+                                    callback(err, res);
                                 });
-                                reactionMenus[messageID] = {actions: actions, channelID: channelID};
+                                reactionMenus[res.id] = {actions: actions, channelID: channelID};
                             } else {
                                 callback(err);
                             }
@@ -426,8 +443,8 @@ module.exports = function(input) {
                         if (isID.reactions) {
                             actions = actions.filter(action => {
                                 let match = isID.reactions.map(r => r.emoji).find(r => {
-                                    let t1 = availableFunctions.emojiToObject(r);
-                                    let t2 = availableFunctions.emojiToObject(action.emoji);
+                                    let t1 = bf.emojiToObject(r);
+                                    let t2 = bf.emojiToObject(action.emoji);
                                     if (t1 == t2 || (t1.id && t2.id && t1.id == t2.id)) return true;
                                 });
                                 if (match) return false;
@@ -435,7 +452,7 @@ module.exports = function(input) {
                             });
                         }
                         if (actions.length) {
-                            availableFunctions.addReactions(channelID, message, actions.map(a => a.emoji), function() {
+                            bf.addReactions(channelID, message, actions.map(a => a.emoji), function() {
                                 callback(null, message);
                             });
                         }
@@ -497,7 +514,7 @@ module.exports = function(input) {
                 }).then(function() {
                     messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.userID == userID));
                     if (!isID) {
-                        availableFunctions.sendMessage(channelID, message, function(err, messageID) {
+                        bf.sendMessage(channelID, message, function(err, messageID) {
                             if (messageID) {
                                 messageMenus.push({channelID: channelID, userID: userID, pattern: pattern, action: action});
                                 callback(err, messageID);
@@ -538,7 +555,7 @@ module.exports = function(input) {
                         callback(err);
                     }
                 } else {
-                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers.get(serverID).name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "info");
+                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers.get(serverID).name} (${serverID})`+(parentID ? ` inside the category ${bf.nameOfChannel(parentID)} (${parentID})` : ""), "info");
                     callback(err, res.id, res);
                 }
             });
@@ -561,7 +578,20 @@ module.exports = function(input) {
         }
     }
 
-    if (bot.connected) {
+    bot.on("messageCreate", messageHandler);
+    function messageHandler(messageObject) {
+        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+        bot.emit("legacyMessage", user, userID, channelID, message, event);
+    }
+    bot.on("messageReactionAdd", reactionHandler);
+    function reactionHandler(messageObject, emoji, userID) {
+        event = {d: {user_id: userID, emoji: emoji, message_id: messageObject.id, channel_id: messageObject.channel.id}};
+        bot.emit("legacyMessageReactionAdd", event);
+    }
+    bot.isDMChannel = function(channelID) {
+        return !bot.channelGuildMap[channelID];
+    }
+    if (bot.startTime) {
         bot.on("messageUpdate", editHandler);
         updateUserEmojis();
     } else {
@@ -572,6 +602,10 @@ module.exports = function(input) {
     }
     reloadEvent.once(__filename, function() {
         bot.removeListener("messageUpdate", editHandler);
+        bot.removeListener("messageCreate", messageHandler);
+        bot.removeListener("messageReactionAdd", reactionHandler);
+        bot.removeListener("legacyMessageReactionAdd", reactionMenuHandler);
+        bot.removeListener("legacyMessage", messageMenuHandler);
     });
     function editHandler(NUL, event) {
         if (event && event.d) {
@@ -584,7 +618,7 @@ module.exports = function(input) {
         new Promise(resolve => {
             if (message) resolve;
             else {
-                availableFunctions.getMessage(userEmojiMessage, (err, res) => {
+                bf.getMessage(userEmojiMessage).then(res => {
                     message = res.content;
                     resolve();
                 });
@@ -598,17 +632,18 @@ module.exports = function(input) {
     }
 
     // Make reaction menus work
-    bot.on("messageReactionAdd", function(event) {
-        if (event.d.user_id == bot.id) return;
+    bot.on("legacyMessageReactionAdd", reactionMenuHandler);
+    function reactionMenuHandler(event) { // TODO: Rewrite with Eris
+        if (event.d.user_id == bot.user.id) return;
         //cf.log(event, "info");
         if (reactionMenus[event.d.message_id]) {
             let menu = reactionMenus[event.d.message_id]; // "menu" is faster to type
             //cf.log(event.d.emoji.name+" // "+menu.actions[0].emoji+" // "+event.d.emoji.name==menu.actions[0].emoji);
-            menu.actions.filter(a => cf.slimMatch([availableFunctions.emojiToObject(a.emoji), event.d.emoji]) || a.emoji == event.d.emoji.name).forEach(function(action) { // Only matching emojis
+            menu.actions.filter(a => cf.slimMatch([bf.emojiToObject(a.emoji), event.d.emoji]) || a.emoji == event.d.emoji.name).forEach(function(action) { // Only matching emojis
                 if (!action.allowedUsers || action.allowedUsers.includes(event.d.user_id)) { // Only take action if the userID is allowed
                     switch (action.actionType) { // Do different things depending on the action type
                     case "reply": // Reply, mention the user in the same channel and give a message
-                        availableFunctions.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
+                        bf.sendMessage(event.d.channel_id, `${action.actionData}`, {mention: event.d.user_id});
                         break;
                     case "edit": // Edit the message containing the menu reactions
                         bot.editMessage({channelID: event.d.channel_id, messageID: event.d.message_id, message: action.actionData});
@@ -620,7 +655,7 @@ module.exports = function(input) {
                     switch (action.ignore) { // Sometimes ignore repeat actions
                     case "that": // Disable actions for that emoji
                         menu.actions = menu.actions.map(a => {
-                            if (cf.slimMatch([availableFunctions.emojiToObject(a.emoji), availableFunctions.emojiToObject(action.emoji)])) {
+                            if (cf.slimMatch([bf.emojiToObject(a.emoji), bf.emojiToObject(action.emoji)])) {
                                 Object.assign(a, {actionType: "none"});
                             }
                             return a;
@@ -635,16 +670,16 @@ module.exports = function(input) {
                     }
                     switch (action.remove) { // Sometimes remove certain emojis after being clicked
                     case "user": // Remove the user's reaction only
-                        availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id);
+                        bf.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id);
                         break;
                     case "bot": // Remove the bot's reaction that the user matched
-                        availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, bot.id);
+                        bf.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, bot.user.id);
                         break;
                     case "that": // Remove everyone's reactions that the user matched
-                        availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, [action.emoji]);
+                        bf.removeReactions(event.d.channel_id, event.d.message_id, [action.emoji]);
                         break;
                     case "menu": // Remove all reactions belonging to that menu
-                        availableFunctions.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji));
+                        bf.removeReactions(event.d.channel_id, event.d.message_id, menu.actions.map(a => a.emoji));
                         break;
                     case "all": // Remove all reactions on that message
                         bot.removeAllReactions({channelID: event.d.channel_id, messageID: event.d.message_id});
@@ -654,19 +689,19 @@ module.exports = function(input) {
                         break;
                     }
                 } else if (action.remove == "user") { // If the user is not allowed, but their reaction should be removed
-                    availableFunctions.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id); // Remove it.
+                    bf.removeReaction(event.d.channel_id, event.d.message_id, action.emoji, event.d.user_id); // Remove it.
                 }
             });
         }
-    });
+    }
     // Make message menus work
-    bot.on("messageCreate", function(messageObject) {
-        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+    bot.on("legacyMessage", messageMenuHandler);
+    function messageMenuHandler(user, userID, channelID, message, event) { //TODO: Rewrite with Eris
         let menu = messageMenus.filter(m => m.channelID == channelID && m.userID == userID && message.match(m.pattern))[0];
         if (menu) {
             menu.action(message, event);
             messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.userID == userID));
         }
-    });
-    return availableFunctions;
+    }
+    return bf;
 };

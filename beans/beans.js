@@ -13,22 +13,22 @@ module.exports = function(input) {
                "<:bowl:389609497980829696>"]
     };
     let spoonables = [];
-    if (bot.connected) {
+    if (bot.startTime) {
         bot.on("messageCreate", messageHandler);
-        bot.on("messageReactionAdd", reactionHandler);
+        bot.on("legacyMessageReactionAdd", reactionHandler);
     } else {
         bot.once("ready", function() {
             bot.on("messageCreate", messageHandler);
-            bot.on("messageReactionAdd", reactionHandler);
+            bot.on("legacyMessageReactionAdd", reactionHandler);
         });
     }
     reloadEvent.once(__filename, function() {
         bot.removeListener("messageCreate", messageHandler);
-        bot.removeListener("messageReactionAdd", reactionHandler);
+        bot.removeListener("legacyMessageReactionAdd", reactionHandler);
     });
     function messageHandler(messageObject) {
         //cf.log(Math.random()*100+" "+Date.now(), "warning");
-        /*if ((Math.random()*100 <= 0.6 && event.d.type == 0 && !bot.users.get(userID).bot && !bot.directMessages[channelID])) {
+        /*if ((Math.random()*100 <= 0.6 && event.d.type == 0 && !bot.users.get(userID).bot && !bot.isDMChannel(channelID))) {
             let spawned = beanEmojis.bowl.slice(0, Math.floor(Math.random()*4+2));
             bf.addReactions(channelID, event.d.id, [...spawned]);
             spoonables.push({channelID: channelID, messageID: event.d.id, spooners: [], bowls: [...spawned]});
@@ -81,7 +81,7 @@ module.exports = function(input) {
                         cf.log(err, "error");
                         return;
                     } else if (!dbr) {
-                        bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels.get(channelID).guild_id)+" has no beans.");
+                        bf.sendMessage(channelID, bf.userIDToNick(target, bot.channelGuildMap[channelID])+" has no beans.");
                     } else {
                         let message = `<@${target}>'s beans:\n`+
                                       `${beanEmojis.bean[0]} ${dbr.beans}\n`+

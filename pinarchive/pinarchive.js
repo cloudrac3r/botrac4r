@@ -7,17 +7,17 @@ module.exports = function(input) {
     let selfUnpin = [];
     let ignoredMessages = [];
     let unpinTimeout = 1000;
-    bot.on("messageCreate", messageEvent);
+    bot.on("legacyMessage", messageEvent);
     bot.on("any", messageUpdateEvent);
     reloadEvent.once(__filename, function() {
-        bot.removeListener("messageCreate", messageEvent);
+        bot.removeListener("legacyMessage", messageEvent);
         bot.removeListener("any", messageUpdateEvent);
     });
     reloadEvent.on("pinarchive ignore", info => {
         ignoredMessages.push(info);
     });
     function getPinChannel(channelID, callback) {
-        pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channels.get(channelID).guild_id, function(err, dbr) {
+        pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channelGuildMap[channelID], function(err, dbr) {
             if (dbr) { // Server is in list of allowed servers
                 pindb.get("SELECT * FROM Channels WHERE origin = ?", channelID, function(err, cdbr) {
                     if (!cdbr) { // No channel overrides
@@ -33,8 +33,7 @@ module.exports = function(input) {
             }
         });
     }
-    function messageEvent(messageObject) {
-        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+    function messageEvent(user, userID, channelID, message, event) {
         if (event.d.type == 6 && bot.channels.get(channelID)) {
             getPinChannel(channelID, function(target, dbr, cdbr) {
                 if (target) {
@@ -63,10 +62,10 @@ module.exports = function(input) {
                                         }
                                     }, {embed: {
                                         author: {
-                                            name: bf.userIDToNick(r.author.id, bot.channels.get(channelID).guild_id, "username"),
+                                            name: bf.userIDToNick(r.author.id, bot.channelGuildMap[channelID], "username"),
                                             icon_url: "https://cdn.discordapp.com/avatars/"+r.author.id+"/"+bot.users.get(r.author.id).avatar+".jpg"
                                         },
-                                        color: bf.userIDToColour(r.author.id, bot.channels.get(channelID).guild_id),
+                                        color: bf.userIDToColour(r.author.id, bot.channelGuildMap[channelID]),
                                         description: r.content,
                                         image: {
                                             url: r.attachments[0].url || r.embeds[0].url
@@ -121,7 +120,7 @@ module.exports = function(input) {
         getPinChannel(channelID, function(target) {
             if (target) {
                 bot.getMessages({channelID: target}, function(e,a) {
-                    a.filter(m => m.author.id == bot.id)
+                    a.filter(m => m.author.id == bot.user.id)
                     .filter(m => m.embeds[0] && m.embeds[0].type == "rich")
                     .forEach(m => {
                         if (m.embeds[0].footer.text.match(/^.+ \| [0-9]{18,} \| pinned by .+$/)) {

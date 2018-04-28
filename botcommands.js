@@ -76,7 +76,7 @@ module.exports = function(input) {
                  || (parseFloat(command.switches.no) >= 0 && parseFloat(command.switches.no) <= 100 ? 100-parseFloat(command.switches.no)+"" : false)
                  || (parseFloat(command.numbers[0]) >= 0 && parseFloat(command.numbers[0]) <= 100 ? parseFloat(command.numbers[0])+"" : false)
                  || 50);
-                cf.log(yesChance, "error");
+                //cf.log(yesChance, "error");
                 let question = (command.nonNumbers[0] ? command.nonNumbers.join(command.split) : "Deciding if you should do something");
                 let yn = (Math.random()*100 < yesChance ? 0 : 1);
                 let response = cf.rarray(words[yn]);

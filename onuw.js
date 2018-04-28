@@ -405,7 +405,7 @@ module.exports = function(input) {
     };
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
-        if (bot.connected) {
+        if (bot.startTime) {
             bf.sendMessage("244613376360054794", "ONUW role set "+n+" does not have the correct array length.");
         }
     });
@@ -413,7 +413,7 @@ module.exports = function(input) {
         constructor(channelID) { // Set up new game
             this.players = [];
             this.centreCards;
-            this.serverID = bot.channels.get(channelID).guild_id;
+            this.serverID = bot.channelGuildMap[channelID];
             this.channelID = channelID;
             this.phase = "not started"; // "night", "day", "voting"
             this.timer = {time: 300000, strict: false};
@@ -526,7 +526,7 @@ module.exports = function(input) {
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
-                if (bot.directMessages[channelID]) {
+                if (bot.isDMChannel(channelID)) {
                     bf.sendMessage(channelID, "You cannot use these commands in a direct message.");
                     return;
                 }

@@ -317,7 +317,7 @@ module.exports = function(input) {
             }}
         ]);
     }
-    if (bot.connected) {
+    if (bot.startTime) {
         loadData(() => {
             realCode();
         });

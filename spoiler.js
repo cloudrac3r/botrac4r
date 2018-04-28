@@ -1,14 +1,14 @@
 module.exports = function(input) {
     let {bot, cf, bf, db, reloadEvent} = input;
-    if (bot.connected) {
-        bot.on("messageReactionAdd", reactionHandler);
+    if (bot.startTime) {
+        bot.on("legacyMessageReactionAdd", reactionHandler);
     } else {
         bot.once("ready", function() {
-            bot.on("messageReactionAdd", reactionHandler);
+            bot.on("legacyMessageReactionAdd", reactionHandler);
         });
     }
     reloadEvent.once(__filename, function() {
-        bot.removeListener("messageReactionAdd", reactionHandler);
+        bot.removeListener("legacyMessageReactionAdd", reactionHandler);
     });
     function reactionHandler(event) {
         if (event.d.emoji.id == "377710017627029505") {

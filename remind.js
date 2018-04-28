@@ -29,7 +29,7 @@ module.exports = function(input) {
                                 bot.deletePinnedMessage(messageObject);
                                 bot.getMessages({channelID: reminder.channelID}, (err, arr) => {
                                     if (err) throw err;
-                                    let pinIndicator = arr.find(m => m.type == 6 && m.author.id == bot.id);
+                                    let pinIndicator = arr.find(m => m.type == 6 && m.author.id == bot.user.id);
                                     if (pinIndicator) bot.deleteMessage({channelID: reminder.channelID, messageID: pinIndicator.id});
                                 });
                             }, 6*1000);
@@ -72,7 +72,7 @@ module.exports = function(input) {
                     w = words[0];
                 }
                 if (valid) {
-                    let receiveChannel = bot.directMessages[channelID] ? userID : channelID;
+                    let receiveChannel = bot.isDMChannel(channelID) ? userID : channelID;
                     db.run("INSERT INTO Reminders VALUES (NULL, ?, ?, ?, ?, ?, ?)", [userID, receiveChannel, d.id, words.join(command.split), time, textTime.join(" ")], err => {
                         db.get("SELECT seq FROM sqlite_sequence WHERE name='Reminders'", (err, dbr) => {
                             if (err) throw err;

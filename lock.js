@@ -25,7 +25,7 @@ module.exports = function(input) {
             });
         });
     }
-    if (bot.connected) manageTimedChannels();
+    if (bot.startTime) manageTimedChannels();
     else bot.once("ready", manageTimedChannels);
     let availableFunctions = {
         lock: {
@@ -37,6 +37,7 @@ module.exports = function(input) {
                 if (!["176580265294954507", "113457314106740736"].includes(userID)) {
                     bf.sendMessage(channelID, "Error: This command has not been enabled for you.");
                 }
+                let channels = bot.getChannel(channelID).guild.channels;
                 if (command.regularWords[0] == "alias") {
                     let targets = command.regularWords.map(w => w.match(/<#([0-9]{16,})>/)).filter(w => w).map(w => w[1]);
                     if (!command.regularWords[1] || !command.regularWords[1].match(/^[a-zA-Z0-9]+$/)) {
@@ -66,16 +67,14 @@ module.exports = function(input) {
                     });
                 } else if (command.regularWords[0] == "list") {
                     let target = (d.mentions[0] ? d.mentions[0].id : userID);
-                    let channels = bot.servers.get(bot.channels.get(channelID).guild_id).channels;
                     ldb.all("SELECT * FROM Lock WHERE userID=?", target, (err, dbr) => {
                         if (dbr.filter(r => Object.keys(channels).includes(r.channelID)).length) {
-                            bf.sendMessage(channelID, "**"+bf.userIDToNick(target, bot.channels.get(channelID).guild_id, "nickname")+"'s locked channels**\n"+Object.keys(channels).filter(c => channels[c].type == 0 && dbr.find(r => r.channelID == c)).sort((a,b) => channels[a].position-channels[b].position).map(c => "#"+channels[c].name).join("\n"));
+                            bf.sendMessage(channelID, "**"+bf.userIDToNick(target, bot.channelGuildMap[channelID], "nickname")+"'s locked channels**\n"+Object.keys(channels).filter(c => channels[c].type == 0 && dbr.find(r => r.channelID == c)).sort((a,b) => channels[a].position-channels[b].position).map(c => "#"+channels[c].name).join("\n"));
                         } else {
-                            bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels.get(channelID).guild_id, "nickname")+" has not locked any channels.");
+                            bf.sendMessage(channelID, bf.userIDToNick(target, bot.channelGuildMap[channelID], "nickname")+" has not locked any channels.");
                         }
                     });
                 } else {
-                    let channels = bot.servers.get(bot.channels.get(channelID).guild_id).channels;
                     let targets = [channelID]; // The channel to lock
                     let channelMention = command.regularWords.map(w => w.match(/<#([0-9]{16,})>/)).filter(w => w).map(w => w[1]);
                     command.regularWords.filter(w => w.match(/^`?#[a-z-]+`?$/)).forEach(w => {
