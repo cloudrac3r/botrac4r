@@ -62,7 +62,7 @@ module.exports = function(input) {
                 } catch (e) {};
                 new Promise((resolve, reject) => {
                     if (!m) {
-                        bf.sendMessage(petIDs.channel, bot.users[this.userID].username+" placeholder", (e,id) => {
+                        bf.sendMessage(petIDs.channel, bot.users.get(this.userID).username+" placeholder", (e,id) => {
                             this.messageID = id;
                             resolve();
                         });
@@ -110,8 +110,8 @@ module.exports = function(input) {
             }
             smartEditMessage(this.messageID, {
                 author: {
-                    name: bot.users[this.userID].username,
-                    icon_url: "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users[this.userID].avatar+".jpg"
+                    name: bot.users.get(this.userID).username,
+                    icon_url: "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users.get(this.userID).avatar+".jpg"
                 },
                 title: this.currentPet().getDisplayName(),
                 description: this.currentPet().statsToDisplay(),
@@ -243,7 +243,7 @@ module.exports = function(input) {
     function valueToMeter(value, notFound) {
         value = Math.floor(Math.min(Math.max(Number(value), 0), 9));
         let emojiName = "lv"+value.toString()
-        let emojiServer = bot.servers["364914967775805440"];
+        let emojiServer = bot.servers.get("364914967775805440");
         if (!emojiName || !emojiServer) {
             return notFound;
         } else {
@@ -263,7 +263,7 @@ module.exports = function(input) {
             timestamp: lastRestartFooter.toJSON()
         };
         embed.fields = users.map(u => ({
-            name: `${bf.userIDToEmoji(u.userID)} ${bot.users[u.userID].username} (${u.pets.length})`,
+            name: `${bf.userIDToEmoji(u.userID)} ${bot.users.get(u.userID).username} (${u.pets.length})`,
             value: u.pets.map(p => `${p.statsToHappinessDisplay()} ${p.name}`).join("\n"),
             inline: true
         }));
@@ -322,7 +322,7 @@ module.exports = function(input) {
             realCode();
         });
     } else {
-        bot.once("allUsers", () => {
+        bot.once("ready", () => {
             loadData(() => {
                 realCode();
             });

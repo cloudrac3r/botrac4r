@@ -20,7 +20,7 @@ module.exports = function(input) {
                         let time = new Date();
                         time.setUTCHours(time.getUTCHours()+parseInt(hourOffset));
                         time.setUTCMinutes(time.getUTCMinutes()+parseInt(minuteOffset));
-                        bf.sendMessage(channelID, `The local time of ${bf.userIDToNick(target, bot.channels[channelID].guild_id, "nickname")} is **${cf.getReadableTime(time, 2, true)}**.`, {mention: userID});
+                        bf.sendMessage(channelID, `The local time of ${bf.userIDToNick(target, bot.channels.get(channelID).guild_id, "nickname")} is **${cf.getReadableTime(time, 2, true)}**.`, {mention: userID});
                     }
                 });
             }

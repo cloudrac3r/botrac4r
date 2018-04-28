@@ -3,7 +3,7 @@ module.exports = function(input) {
     if (bot.connected) {
         bot.on("messageReactionAdd", reactionHandler);
     } else {
-        bot.once("allUsers", function() {
+        bot.once("ready", function() {
             bot.on("messageReactionAdd", reactionHandler);
         });
     }

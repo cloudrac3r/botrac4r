@@ -7,17 +7,17 @@ module.exports = function(input) {
     let selfUnpin = [];
     let ignoredMessages = [];
     let unpinTimeout = 1000;
-    bot.on("message", messageEvent);
+    bot.on("messageCreate", messageEvent);
     bot.on("any", messageUpdateEvent);
     reloadEvent.once(__filename, function() {
-        bot.removeListener("message", messageEvent);
+        bot.removeListener("messageCreate", messageEvent);
         bot.removeListener("any", messageUpdateEvent);
     });
     reloadEvent.on("pinarchive ignore", info => {
         ignoredMessages.push(info);
     });
     function getPinChannel(channelID, callback) {
-        pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channels[channelID].guild_id, function(err, dbr) {
+        pindb.get("SELECT * FROM Servers WHERE serverID = ?", bot.channels.get(channelID).guild_id, function(err, dbr) {
             if (dbr) { // Server is in list of allowed servers
                 pindb.get("SELECT * FROM Channels WHERE origin = ?", channelID, function(err, cdbr) {
                     if (!cdbr) { // No channel overrides
@@ -33,8 +33,9 @@ module.exports = function(input) {
             }
         });
     }
-    function messageEvent(user, userID, channelID, message, event) {
-        if (event.d.type == 6 && bot.channels[channelID]) {
+    function messageEvent(messageObject) {
+        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+        if (event.d.type == 6 && bot.channels.get(channelID)) {
             getPinChannel(channelID, function(target, dbr, cdbr) {
                 if (target) {
                     cf.log("Pin posting", "info");
@@ -62,16 +63,16 @@ module.exports = function(input) {
                                         }
                                     }, {embed: {
                                         author: {
-                                            name: bf.userIDToNick(r.author.id, bot.channels[channelID].guild_id, "username"),
-                                            icon_url: "https://cdn.discordapp.com/avatars/"+r.author.id+"/"+bot.users[r.author.id].avatar+".jpg"
+                                            name: bf.userIDToNick(r.author.id, bot.channels.get(channelID).guild_id, "username"),
+                                            icon_url: "https://cdn.discordapp.com/avatars/"+r.author.id+"/"+bot.users.get(r.author.id).avatar+".jpg"
                                         },
-                                        color: bf.userIDToColour(r.author.id, bot.channels[channelID].guild_id),
+                                        color: bf.userIDToColour(r.author.id, bot.channels.get(channelID).guild_id),
                                         description: r.content,
                                         image: {
                                             url: r.attachments[0].url || r.embeds[0].url
                                         },
                                         footer: {
-                                            text: (cdbr.name || "#"+bot.channels[r.channel_id].name)+" | "+r.id+" | pinned by "+bot.users[userID].username
+                                            text: (cdbr.name || "#"+bot.channels.get(r.channel_id).name)+" | "+r.id+" | pinned by "+bot.users.get(userID).username
                                         },
                                         timestamp: new Date(r.timestamp).toJSON()
                                     }});
@@ -115,7 +116,7 @@ module.exports = function(input) {
         }
     }
     function somethingWasUnpinned(channelID, latestTimestamp, messageID) {
-        if (!bot.channels[channelID]) return;
+        if (!bot.channels.get(channelID)) return;
         cf.log("Something unpinned", "info");
         getPinChannel(channelID, function(target) {
             if (target) {
@@ -124,7 +125,7 @@ module.exports = function(input) {
                     .filter(m => m.embeds[0] && m.embeds[0].type == "rich")
                     .forEach(m => {
                         if (m.embeds[0].footer.text.match(/^.+ \| [0-9]{18,} \| pinned by .+$/)) {
-                            let pinner = Object.keys(bot.users).find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == bot.users[u].username);
+                            let pinner = Object.keys(bot.users).find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == bot.users.get(u).username);
                             //cf.log(pinner, "warning");
                             if (m.embeds[0].footer.text.includes(messageID)) {
                                 if (selfUnpin.includes(messageID)) {

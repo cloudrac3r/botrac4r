@@ -65,16 +65,13 @@ let defaultAltSplit = ";";
 let defaultMentionPref = 1;
 let configurables;
 
-let Discord = require("discord.io-gateway_v6"); // Switch to a fork of discord.io with gateway v6 support
+let Discord = require("eris", {getAllUsers: true}); // Switch to a fork of discord.io with gateway v6 support
 let fs = require("fs");
 let request = require("request");
 let sqlite = require("sqlite3");
 let db = new sqlite.Database(__dirname+"/botrac4r.db");
 
-let bot = new Discord.Client({ // Log in bot
-    token: token,
-    autorun: true
-});
+let bot = new Discord(token); // Log in bot
 loadModules(); // Actually load the modules
 let log = cf.log; // Shortcut to log
 
@@ -133,22 +130,18 @@ function loadModules(module) {
     });
 }
 
-bot.once("ready", function() {
-    log("Loading users", "info");
-    bot.getAllUsers();
-});
-
 bot.on("ready", function() {
-    bot.setPresence({game: {name: defaultPrefix + "help", type: 0}});
+    bot.editStatus("online", {name: defaultPrefix + "help", type: 0});
 });
 
-bot.once("allUsers", function() { // Once the bot connects
-    log(`Logged in as ${bot.username} (${bot.id})`, "info");
+bot.once("ready", function() { // Once the bot connects
+    log(`Logged in as ${bot.user.username} (${bot.user.id})`, "info");
 });
 
-bot.on("message", function(user, userID, channelID, message, event) {
-    if (!bot.users[userID]) return; // Ignore "fake users"
-    if (bot.users[userID].bot) return; // Ignore other bots
+bot.on("messageCreate", function(messageObject) {
+    let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+    if (!bot.users.get(userID)) return; // Ignore "fake users"
+    if (bot.users.get(userID).bot) return; // Ignore other bots
     if (message == defaultPrefix+"configure") {
         bc.setup.code(userID, channelID, "", event.d);
         return;
@@ -199,6 +192,8 @@ bot.on("message", function(user, userID, channelID, message, event) {
         }
     });
 });
+
+bot.connect();
 
 bot.on("disconnect", function(err, code) {
     log("Disconnected from Discord ("+err+code+"), will reconnect automatically.", "info");

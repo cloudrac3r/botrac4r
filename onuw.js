@@ -108,7 +108,7 @@ module.exports = function(input) {
                     {emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}
                 ];
             } else {
-                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users[i.userID].username+" ("+i.type+")"))+".";
+                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users.get(i.userID).username+" ("+i.type+")"))+".";
                 actions = [
                     {emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}
                 ];
@@ -129,8 +129,8 @@ module.exports = function(input) {
                     let info = game.getPlayerMenu([player.userID]);
                     function actionManager(event) {
                         let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                        bf.sendMessage(event.d.channel_id, `${bot.users[chosen.userID].username}'s card is ${chosen.card.role}.`);
-                        game.addToLog(player.userID, player.card.role, `Looked at ${bot.users[chosen.userID].username}'s card: ${chosen.card.role}`);
+                        bf.sendMessage(event.d.channel_id, `${bot.users.get(chosen.userID).username}'s card is ${chosen.card.role}.`);
+                        game.addToLog(player.userID, player.card.role, `Looked at ${bot.users.get(chosen.userID).username}'s card: ${chosen.card.role}`);
                         finished();
                     }
                     bf.reactionMenu(event.d.channel_id, "Choose a player.\n"+info.list.join("\n"),
@@ -178,7 +178,7 @@ module.exports = function(input) {
                 let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
                 bf.sendMessage(event.d.channel_id, "You stole and became a "+chosen.card.role+".");
                 finished(this.order, function() {
-                    game.addToLog(player.userID, player.card.role, `Stole ${bot.users[chosen.userID].username}'s ${chosen.card.role}`);
+                    game.addToLog(player.userID, player.card.role, `Stole ${bot.users.get(chosen.userID).username}'s ${chosen.card.role}`);
                     let newCard = player.exchangeCard(chosen);
                 });
             });
@@ -207,13 +207,13 @@ module.exports = function(input) {
                 clickCount++;
                 if (!previouslyClicked) {
                     previouslyClicked = chosen;
-                    bf.sendMessage(event.d.channel_id, bot.users[previouslyClicked.userID].username+"'s card will be swapped with...", function(e,id) {
+                    bf.sendMessage(event.d.channel_id, bot.users.get(previouslyClicked.userID).username+"'s card will be swapped with...", function(e,id) {
                         previousMessageID = id;
                     });
                 } else if (previouslyClicked.userID == chosen.userID) {
                     clickCount--;
                 } else if (clickCount == 2) {
-                    let message = bot.users[previouslyClicked.userID].username+"'s card has been swapped with "+bot.users[chosen.userID].username+"'s card.";
+                    let message = bot.users.get(previouslyClicked.userID).username+"'s card has been swapped with "+bot.users.get(chosen.userID).username+"'s card.";
                     if (previousMessageID) {
                         bf.editMessage(event.d.channel_id, previousMessageID, message, function(e) {
                             if (e) {
@@ -224,7 +224,7 @@ module.exports = function(input) {
                         bf.sendMessage(event.d.channel_id, message);
                     }
                     finished(this.order, function() {
-                        game.addToLog(player.userID, player.card.role, `Swapped ${bot.users[previouslyClicked.userID].username}'s ${previouslyClicked.card.role} with ${bot.users[chosen.userID].username}'s ${chosen.card.role}`);
+                        game.addToLog(player.userID, player.card.role, `Swapped ${bot.users.get(previouslyClicked.userID).username}'s ${previouslyClicked.card.role} with ${bot.users.get(chosen.userID).username}'s ${chosen.card.role}`);
                         chosen.exchangeCard(previouslyClicked);
                     });
                 } else {
@@ -260,7 +260,7 @@ module.exports = function(input) {
             } else if (masonList.length == 1) {
                 message += "The other mason in this game is "+bf.userIDToNick(masonList[0], game.serverID, "username")+".";
             } else {
-                message += "The other masons in this game are "+cf.listify(masonList.map(i => bot.users[i].username))+".";
+                message += "The other masons in this game are "+cf.listify(masonList.map(i => bot.users.get(i).username))+".";
             }
             actions = [{emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}];
             return {message: message, actions: actions};
@@ -339,13 +339,13 @@ module.exports = function(input) {
                           "The other werewolf in this game is "+bf.userIDToNick(wolfList[0].userID, game.serverID, "username")+" ("+wolfList[0].type+").";
             }else {
                 message = "As mystic wolf, you may examine the card of any non-wolf player.\n"+
-                          "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users[i.userID].username+" ("+i.type+")"))+".";
+                          "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users.get(i.userID).username+" ("+i.type+")"))+".";
             }
             let wolfPlays = game.players.filter(p => ["werewolf", "dream wolf", "mystic wolf"].includes(p.card.role));
             let info = game.getPlayerMenu([wolfPlays], function(event) {
                 let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                    bf.sendMessage(event.d.channel_id, `${bot.users[chosen.userID].username}'s card is ${chosen.card.role}.`);
-                    game.addToLog(player.userID, player.card.role, `Looked at ${bot.users[chosen.userID].username}'s card: ${chosen.card.role}`);
+                    bf.sendMessage(event.d.channel_id, `${bot.users.get(chosen.userID).username}'s card is ${chosen.card.role}.`);
+                    game.addToLog(player.userID, player.card.role, `Looked at ${bot.users.get(chosen.userID).username}'s card: ${chosen.card.role}`);
                     finished();
             });
             message += "\nChoose a player to examine the card of.\n"+info.list.join("\n");
@@ -413,7 +413,7 @@ module.exports = function(input) {
         constructor(channelID) { // Set up new game
             this.players = [];
             this.centreCards;
-            this.serverID = bot.channels[channelID].guild_id;
+            this.serverID = bot.channels.get(channelID).guild_id;
             this.channelID = channelID;
             this.phase = "not started"; // "night", "day", "voting"
             this.timer = {time: 300000, strict: false};
@@ -513,7 +513,7 @@ module.exports = function(input) {
             let info = game.getPlayerMenu([], function(event) {
                 let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
                 chosen.votesFor++;
-                bf.sendMessage(event.d.channel_id, "You voted for "+bot.users[chosen.userID].username+".");
+                bf.sendMessage(event.d.channel_id, "You voted for "+bot.users.get(chosen.userID).username+".");
                 finished();
             });
             bf.reactionMenu(this.userID, "Choose a user to vote for.\n"+info.list.join("\n"), info.actions);
@@ -589,7 +589,7 @@ module.exports = function(input) {
                     let game = games.filter(g => g.channelID == channelID)[0];
                     if (game) {
                         bf.sendMessage(channelID, "**Current ONUW game details**\n"+
-                            "**Players**: "+cf.listify(game.players.map(p => bot.users[p.userID].username).sort(), "nobody")+"\n"+
+                            "**Players**: "+cf.listify(game.players.map(p => bot.users.get(p.userID).username).sort(), "nobody")+"\n"+
                             "**Cards**: "+cf.listify((cardSets[game.players.length] || []).map(c => c.role), "N/A")+"\n"+
                             "**Timer**: "+(game.phase == "day" ? (game.timer.time ? (game.timer.time-Date.now()+game.startedAt >= 0 ? (Math.floor((game.timer.time-Date.now()+game.startedAt)/60000)+":"+(Math.floor((game.timer.time-Date.now()+game.startedAt)/1000%60)+"").padStart(2, "0")+" remaining") : "expired!") : "off") : (game.timer.time ? parseInt((game.timer.time/60000).toFixed(2))+" "+cf.plural("minute", game.timer.time/60000)+", "+(game.timer.strict ? "strict" : "not strict") : "off")),
                             function(e,id) {
@@ -747,7 +747,7 @@ module.exports = function(input) {
                                     `**${p.votesFor}**: <@${p.userID}> (${p.originalCard.role} → ${p.card.role})`).join("\n")+"\n\n"+
                                     "Use the buttons to view more info or to start a new game.",
                                     //"Here are all the players that died:\n"+
-                                    //cf.listify(deadPlayers.map(p => bot.users[p.userID].username), "Nobody (because everyone received exactly one vote).")+"\n"+
+                                    //cf.listify(deadPlayers.map(p => bot.users.get(p.userID).username), "Nobody (because everyone received exactly one vote).")+"\n"+
                                     //"Here is the result of all the teams:\n"+
                                     //includedTeams.map(t => `${t.name}
                                     [

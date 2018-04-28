@@ -145,9 +145,10 @@ module.exports = function(input) {
         return ut.partialMatch(name, b, ["fullName"]) || ut.partialMatch(name, b, ["name"]);
     }
     cf.rc = function(input) {
-        return messageEvent(bot.users["176580265294954507"].username, "176580265294954507", game.channel, input, {console: true});
+        return messageEvent(bot.users.get("176580265294954507").username, "176580265294954507", game.channel, input, {console: true});
     }
-    function messageEvent(user, userID, channelID, message, event) {
+    function messageEvent(messageObject) {
+        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
         function output(text) {
             if (text == "`") return; // Purposeful "don't output anything" dummy
             if (text && text.embed) {
@@ -285,9 +286,9 @@ module.exports = function(input) {
         saveGame();
     }
     loadGame(() => {
-        bot.on("message", messageEvent);
+        bot.on("messageCreate", messageEvent);
     });
     reloadEvent.once(__filename, () => {
-        bot.removeListener("message", messageEvent);
+        bot.removeListener("messageCreate", messageEvent);
     });
 }

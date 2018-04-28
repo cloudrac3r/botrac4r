@@ -16,7 +16,7 @@ module.exports = function(input) {
                         bf.sendMessage(channelID, "", {mention: userID, embed: {
                             title: "Sp"+"a".repeat(Math.floor(Math.random()*24+6))+"ce"+"!".repeat(Math.round(Math.random()*2)),
                             image: {url: encodeURI(url)},
-                            color: bot.directMessages[channelID] ? 0x5c53d4 : bf.userIDToColour(bot.id, bot.channels[channelID].guild_id)
+                            color: bot.directMessages[channelID] ? 0x5c53d4 : bf.userIDToColour(bot.id, bot.channels.get(channelID).guild_id)
                         }});
                     } catch (e) {
                         if (e.toString().match(/^SyntaxError.*JSON/) || e.toString() == "SyntaxError: data is undefined") {

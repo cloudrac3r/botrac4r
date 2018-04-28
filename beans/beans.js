@@ -14,21 +14,21 @@ module.exports = function(input) {
     };
     let spoonables = [];
     if (bot.connected) {
-        bot.on("message", messageHandler);
+        bot.on("messageCreate", messageHandler);
         bot.on("messageReactionAdd", reactionHandler);
     } else {
-        bot.once("allUsers", function() {
-            bot.on("message", messageHandler);
+        bot.once("ready", function() {
+            bot.on("messageCreate", messageHandler);
             bot.on("messageReactionAdd", reactionHandler);
         });
     }
     reloadEvent.once(__filename, function() {
-        bot.removeListener("message", messageHandler);
+        bot.removeListener("messageCreate", messageHandler);
         bot.removeListener("messageReactionAdd", reactionHandler);
     });
-    function messageHandler(user, userID, channelID, message, event) {
+    function messageHandler(messageObject) {
         //cf.log(Math.random()*100+" "+Date.now(), "warning");
-        /*if ((Math.random()*100 <= 0.6 && event.d.type == 0 && !bot.users[userID].bot && !bot.directMessages[channelID])) {
+        /*if ((Math.random()*100 <= 0.6 && event.d.type == 0 && !bot.users.get(userID).bot && !bot.directMessages[channelID])) {
             let spawned = beanEmojis.bowl.slice(0, Math.floor(Math.random()*4+2));
             bf.addReactions(channelID, event.d.id, [...spawned]);
             spoonables.push({channelID: channelID, messageID: event.d.id, spooners: [], bowls: [...spawned]});
@@ -81,7 +81,7 @@ module.exports = function(input) {
                         cf.log(err, "error");
                         return;
                     } else if (!dbr) {
-                        bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels[channelID].guild_id)+" has no beans.");
+                        bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels.get(channelID).guild_id)+" has no beans.");
                     } else {
                         let message = `<@${target}>'s beans:\n`+
                                       `${beanEmojis.bean[0]} ${dbr.beans}\n`+
@@ -122,7 +122,7 @@ module.exports = function(input) {
                                                         if (user.beans-beansPerCan+beanBonus < beansPerCan) bf.removeReaction(channelID, event.d.message_id, beanEmojis.can[0], event.d.user_id);
                                                     });
                                                     let message = "```YAML\n"+cf.tableify([
-                                                            beaners.map(u => bot.users[u].username+":"),
+                                                            beaners.map(u => bot.users.get(u).username+":"),
                                                             beaners.map(u => all.find(row => row.userID == u).beans),
                                                             beaners.map(u => "-"+beansPerCan),
                                                             beaners.map(u => "+"+beanBonus+"  ->"),

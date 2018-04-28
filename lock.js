@@ -14,10 +14,10 @@ module.exports = function(input) {
                         if (!test) return;
                         bot.editChannelPermissions({channelID: row.channelID, userID: row.userID, default: [Discord.Permissions.TEXT_READ_MESSAGES]}, (err) => {
                             if (err) {
-                                bf.sendMessage(row.userID, "Error: I couldn't remove the timed lock on the channel **#"+bot.channels[row.channelID].name+"**.\n`"+JSON.stringify(err)+"`");
+                                bf.sendMessage(row.userID, "Error: I couldn't remove the timed lock on the channel **#"+bot.channels.get(row.channelID).name+"**.\n`"+JSON.stringify(err)+"`");
                                 return;
                             }
-                            bf.sendMessage(row.userID, "The timed lock on the channel **#"+bot.channels[row.channelID].name+"** has been removed.");
+                            bf.sendMessage(row.userID, "The timed lock on the channel **#"+bot.channels.get(row.channelID).name+"** has been removed.");
                             ldb.run("DELETE FROM Lock WHERE userID=? AND channelID=?", [row.userID, row.channelID]);
                         });
                     });
@@ -26,7 +26,7 @@ module.exports = function(input) {
         });
     }
     if (bot.connected) manageTimedChannels();
-    else bot.once("allUsers", manageTimedChannels);
+    else bot.once("ready", manageTimedChannels);
     let availableFunctions = {
         lock: {
             aliases: ["lock"],
@@ -66,16 +66,16 @@ module.exports = function(input) {
                     });
                 } else if (command.regularWords[0] == "list") {
                     let target = (d.mentions[0] ? d.mentions[0].id : userID);
-                    let channels = bot.servers[bot.channels[channelID].guild_id].channels;
+                    let channels = bot.servers.get(bot.channels.get(channelID).guild_id).channels;
                     ldb.all("SELECT * FROM Lock WHERE userID=?", target, (err, dbr) => {
                         if (dbr.filter(r => Object.keys(channels).includes(r.channelID)).length) {
-                            bf.sendMessage(channelID, "**"+bf.userIDToNick(target, bot.channels[channelID].guild_id, "nickname")+"'s locked channels**\n"+Object.keys(channels).filter(c => channels[c].type == 0 && dbr.find(r => r.channelID == c)).sort((a,b) => channels[a].position-channels[b].position).map(c => "#"+channels[c].name).join("\n"));
+                            bf.sendMessage(channelID, "**"+bf.userIDToNick(target, bot.channels.get(channelID).guild_id, "nickname")+"'s locked channels**\n"+Object.keys(channels).filter(c => channels[c].type == 0 && dbr.find(r => r.channelID == c)).sort((a,b) => channels[a].position-channels[b].position).map(c => "#"+channels[c].name).join("\n"));
                         } else {
-                            bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels[channelID].guild_id, "nickname")+" has not locked any channels.");
+                            bf.sendMessage(channelID, bf.userIDToNick(target, bot.channels.get(channelID).guild_id, "nickname")+" has not locked any channels.");
                         }
                     });
                 } else {
-                    let channels = bot.servers[bot.channels[channelID].guild_id].channels;
+                    let channels = bot.servers.get(bot.channels.get(channelID).guild_id).channels;
                     let targets = [channelID]; // The channel to lock
                     let channelMention = command.regularWords.map(w => w.match(/<#([0-9]{16,})>/)).filter(w => w).map(w => w[1]);
                     command.regularWords.filter(w => w.match(/^`?#[a-z-]+`?$/)).forEach(w => {
@@ -96,7 +96,7 @@ module.exports = function(input) {
                             });
                         } else resolve();
                     }).then(() => {
-                        if (command.regularWords[0] == "all") targets = Object.keys(bot.servers[bot.channels[channelID].name].channels).filter(c => bot.servers[bot.channels[channelID].name].channels[c].type == "text");
+                        if (command.regularWords[0] == "all") targets = Object.keys(bot.servers.get(bot.channels.get(channelID).name).channels).filter(c => bot.servers.get(bot.channels.get(channelID).name).channels[c].type == "text");
                         let permissions = {deny: [], default: []};
                         if (command.flags.on.includes("lock")) {
                             permissions = {deny: [Discord.Permissions.TEXT_READ_MESSAGES]};
@@ -147,10 +147,10 @@ module.exports = function(input) {
                                                         if (!test) return;
                                                         bot.editChannelPermissions({channelID: target, userID: userID, default: [Discord.Permissions.TEXT_READ_MESSAGES]}, (err) => {
                                                             if (err) {
-                                                                bf.sendMessage(userID, "Error: I couldn't remove the timed lock on the channel **#"+bot.channels[target].name+"**.\n`"+JSON.stringify(err)+"`");
+                                                                bf.sendMessage(userID, "Error: I couldn't remove the timed lock on the channel **#"+bot.channels.get(target).name+"**.\n`"+JSON.stringify(err)+"`");
                                                                 return;
                                                             }
-                                                            bf.sendMessage(userID, "The timed lock on the channel **#"+bot.channels[target].name+"** has been removed.");
+                                                            bf.sendMessage(userID, "The timed lock on the channel **#"+bot.channels.get(target).name+"** has been removed.");
                                                             ldb.run("DELETE FROM Lock WHERE userID=? AND channelID=?", [userID, target]);
                                                         });
                                                     });

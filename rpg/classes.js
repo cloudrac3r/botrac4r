@@ -173,7 +173,7 @@ module.exports = function(input) {
         embedAuthor() { // return name and avatar for display as author of an embed
             return {
                 name: this.fullName || this.name, // if you haven't seen the || operator before, it returns the first thing, but if there is no first thing, it moves on to the next thing
-                icon_url: (this.userID ? "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users[this.userID].avatar+".jpg?size=32" : undefined) // if it's controlled by a player return the player's avatar
+                icon_url: (this.userID ? "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users.get(this.userID).avatar+".jpg?size=32" : undefined) // if it's controlled by a player return the player's avatar
             }
         }
         getItem(name) { // return a specific item and its position in this Being's inventory

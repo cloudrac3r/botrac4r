@@ -6,42 +6,6 @@ module.exports = function(input) {
     let reactionMenus = {};
     let messageMenus = [];
 
-    if (bot.connected) {
-        bot.on("messageUpdate", editHandler);
-        updateUserEmojis();
-    } else {
-        bot.once("allUsers", function() {
-            updateUserEmojis();
-            bot.on("messageUpdate", editHandler);
-        });
-    }
-    reloadEvent.once(__filename, function() {
-        bot.removeListener("messageUpdate", editHandler);
-    });
-    function editHandler(NUL, event) {
-        if (event && event.d) {
-            if (event.d.channel_id == userEmojiMessage.channelID && event.d.message_id == userEmojiMessage.messageID) {
-                updateUserEmojis(event.d.content);
-            }
-        }
-    }
-    function updateUserEmojis(message) {
-        new Promise(resolve => {
-            if (message) resolve;
-            else {
-                bot.getMessage(userEmojiMessage, (err, res) => {
-                    message = res.content;
-                    resolve();
-                });
-            }
-        }).then(() => {
-            message.split("\n").forEach(line => {
-                let [userID, emoji] = line.split(" ");
-                userEmojis[userID] = emoji;
-            });
-        });
-    }
-
     let availableFunctions = {
         messageCharacterLimit: 2000,
         // Button reactions.
@@ -88,24 +52,24 @@ module.exports = function(input) {
         },
         // Given a userID and serverID, return the user's display name.
         userIDToNick: function(userID, serverID, prefer) {
-            if (!bot.users[userID]) return "(unknown user: "+userID+")";
+            if (!bot.users.get(userID)) return "(unknown user: "+userID+")";
             if (!prefer) prefer = "";
-            if (serverID && bot.servers[serverID].members[userID]) {
-                if (bot.servers[serverID].members[userID].nick) {
+            if (serverID && bot.servers.get(serverID).members.get(userID)) {
+                if (bot.servers.get(serverID).members.get(userID).nick) {
                     if (prefer.startsWith("user")) {
-                        return bot.users[userID].username+" ("+bot.servers[serverID].members[userID].nick+")";
+                        return bot.users.get(userID).username+" ("+bot.servers.get(serverID).members.get(userID).nick+")";
                     } else if (prefer.startsWith("nick")) {
-                        return bot.servers[serverID].members[userID].nick+" ("+bot.users[userID].username+")";
+                        return bot.servers.get(serverID).members.get(userID).nick+" ("+bot.users.get(userID).username+")";
                     } else {
-                        return bot.servers[serverID].members[userID].nick;
+                        return bot.servers.get(serverID).members.get(userID).nick;
                     }
                 }
             }
-            return bot.users[userID].username;
+            return bot.users.get(userID).username;
         },
         // Given a userID and serverID, return the colour of the user's name.
         userIDToColour: function(userID, serverID) {
-            let role = bot.servers[serverID].members[userID].roles.map(r => bot.servers[serverID].roles[r]).sort((a,b) => b.position-a.position).filter(r => r.color != 0)[0];
+            let role = bot.servers.get(serverID).members.get(userID).roles.map(r => bot.servers.get(serverID).roles[r]).sort((a,b) => b.position-a.position).filter(r => r.color != 0)[0];
             return role ? role.color : 0x808080;
         },
         // Given a userID, return the custom emoji representing the user
@@ -116,8 +80,8 @@ module.exports = function(input) {
         // Given a userID or channelID, return its display name.
         nameOfChannel: function(channelID) {
             let channelName = "an unnamed channel";
-            if (bot.users[channelID]) {
-                channelName = "@"+bot.users[channelID].username;
+            if (bot.users.get(channelID)) {
+                channelName = "@"+bot.users.get(channelID).username;
             } else if (bot.directMessages[channelID]) {
                 /*if (bot.directMessages[channelID].recipients) { // Using LC's lib
                     channelName = "@"+bot.directMessages[channelID].recipients[0].username;
@@ -125,7 +89,7 @@ module.exports = function(input) {
                     channelName = "@"+bot.directMessages[channelID].recipient.username;
                 /*}*/
             } else {
-                channelName = "#"+bot.channels[channelID].name;
+                channelName = "#"+bot.channels.get(channelID).name;
             }
             return channelName;
         },
@@ -140,6 +104,19 @@ module.exports = function(input) {
                 return {name: emoji.replace(customEmojiRegex, "$1"), id: emoji.replace(customEmojiRegex, "$2")};
             }
             return emoji;
+        },
+        // Get a message from a channel.
+        getMessage: function(channelID, messageID, callback) {
+            if (!callback) callback = new Function();
+            if (typeof(channelID) == "object") {
+                messageID = channelID.messageID;
+                channelID = channelID.channelID;
+            }
+            let promise = bot.getMessage(channelID, messageID);
+            promise.then(messageObject => {
+                callback(null, messageObject);
+            });
+            return promise;
         },
         // Send a message to a channel.
         sendMessage: function(channelID, message, callback, additional) {
@@ -421,7 +398,7 @@ module.exports = function(input) {
                 new Promise(function(resolve, reject) {
                     if (isID) {
                         resolve();
-                    } else if (bot.users[channelID]) {
+                    } else if (bot.users.get(channelID)) {
                         bot.createDMChannel(channelID, function(err, res) {
                             if (err) callback(err);
                             else {
@@ -490,7 +467,7 @@ module.exports = function(input) {
             new Promise(function(resolve, reject) {
                 if (isID) {
                     resolve();
-                } else if (bot.users[channelID]) {
+                } else if (bot.users.get(channelID)) {
                     bot.createDMChannel(channelID, function(err, res) {
                         if (err) callback(err);
                         else {
@@ -561,7 +538,7 @@ module.exports = function(input) {
                         callback(err);
                     }
                 } else {
-                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers[serverID].name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "info");
+                    cf.log(`Created a ${type} channel named ${name} in the server ${bot.servers.get(serverID).name} (${serverID})`+(parentID ? ` inside the category ${availableFunctions.nameOfChannel(parentID)} (${parentID})` : ""), "info");
                     callback(err, res.id, res);
                 }
             });
@@ -583,6 +560,43 @@ module.exports = function(input) {
             });
         }
     }
+
+    if (bot.connected) {
+        bot.on("messageUpdate", editHandler);
+        updateUserEmojis();
+    } else {
+        bot.once("ready", function() {
+            updateUserEmojis();
+            bot.on("messageUpdate", editHandler);
+        });
+    }
+    reloadEvent.once(__filename, function() {
+        bot.removeListener("messageUpdate", editHandler);
+    });
+    function editHandler(NUL, event) {
+        if (event && event.d) {
+            if (event.d.channel_id == userEmojiMessage.channelID && event.d.message_id == userEmojiMessage.messageID) {
+                updateUserEmojis(event.d.content);
+            }
+        }
+    }
+    function updateUserEmojis(message) {
+        new Promise(resolve => {
+            if (message) resolve;
+            else {
+                availableFunctions.getMessage(userEmojiMessage, (err, res) => {
+                    message = res.content;
+                    resolve();
+                });
+            }
+        }).then(() => {
+            message.split("\n").forEach(line => {
+                let [userID, emoji] = line.split(" ");
+                userEmojis[userID] = emoji;
+            });
+        });
+    }
+
     // Make reaction menus work
     bot.on("messageReactionAdd", function(event) {
         if (event.d.user_id == bot.id) return;
@@ -646,7 +660,8 @@ module.exports = function(input) {
         }
     });
     // Make message menus work
-    bot.on("message", function(user, userID, channelID, message, event) {
+    bot.on("messageCreate", function(messageObject) {
+        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
         let menu = messageMenus.filter(m => m.channelID == channelID && m.userID == userID && message.match(m.pattern))[0];
         if (menu) {
             menu.action(message, event);
