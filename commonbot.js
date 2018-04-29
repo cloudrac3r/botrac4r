@@ -154,7 +154,7 @@ module.exports = function(input) {
                     return input.name;
                 }
             } else if (typeof(input) == "string") {
-                let ceregex = /^<:([a-zA-Z_-]):([0-9]+)>$/;
+                let ceregex = /^<:([a-zA-Z_-]{2,32}):([0-9]+)>$/;
                 let match = input.match(ceregex);
                 if (match) {
                     return match[1]+":"+match[2];
@@ -226,7 +226,7 @@ module.exports = function(input) {
         },
         // Edit a message sent by the bot.
         editMessage: function() {
-            let args = [], message, content, c, a
+            let args = [];
             Object.values(arguments).forEach(v => {
                 args.push(v);
             });
@@ -244,9 +244,49 @@ module.exports = function(input) {
                     promise = message.edit(additional);
                 }
                 promise.then(messageObject => callback(null, messageObject));
+                promise.catch(err => {
+                    callback(err);
+                    switch (err.code) {
+                    default:
+                        throw err;
+                    }
+                });
                 return promise;
             });
-        }   
+        },
+        // React to a message.
+        addReaction: function() {
+            let args = [];
+            Object.values(arguments).forEach(v => {
+                args.push(v);
+            });
+            return bf.resolveChannel(args[0])
+            .then(channel => {
+                if (channel) args = args.slice(1);
+                let [message, reaction, callback] = args;
+                if (!callback) callback = new Function();
+                reaction = bf.fixEmoji(reaction);
+                let promise;
+                if (channel) {
+                    if (typeof(message) == "object") message = message.id;
+                    promise = bot.addMessageReaction(channel.id, message, reaction);
+                } else {
+                    promise = message.addReaction(reaction);
+                }
+                promise.then(callback);
+                promise.catch(err => {
+                    callback(err);
+                    switch (err.code) {
+                    case 10014:
+                        cf.log(`Unknown emoji ${reaction} when adding reaction to ${message} in ${bf.nameOfChannel(channel.id)}`, "error");
+                        break;
+                    default:
+                        throw err;
+                    }
+                });
+                return promise;
+            });
+        }
     }
 
     return bf;
