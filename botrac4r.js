@@ -1,5 +1,7 @@
 #!/usr/local/bin/node
 
+process.on("unhandledRejection", err => { throw err });
+
 /// === REQUIRES, CONSTANTS AND GLOBALS ===
 
 let cf = {}; let bf = {}; let bc = {}; // Common Functions, Bot Framework and Bot Commands
@@ -16,6 +18,9 @@ let modules = [ // Load these modules on startup and on change
         filename: __dirname+"/botcommands.js",
         dest: "bot commands"
     },{
+        filename: __dirname+"/names.js",
+        dest: "bot framework"
+    }/*,{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
     },{
@@ -27,15 +32,12 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/garfield.js",
         dest: "bot commands"
-    },{/*
+    },{
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/beans/beans.js",
         dest: "bot commands"
-    },{*/
-        filename: __dirname+"/names.js",
-        dest: "bot framework"
     },{
         filename: __dirname+"/only-cloud-cares.js",
         dest: "bot commands"
@@ -54,7 +56,7 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/remind.js",
         dest: "bot commands"
-    }
+    }*/
 ];
 
 let token = require(__dirname+"/token.js"); // Bot token

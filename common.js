@@ -45,8 +45,12 @@ module.exports = {
         if (typeof(input) == "boolean") return input.toString();
         if (!input) return "undefined";
         if (typeof(input) == "object") {
-            if (longJSON) return JSON.stringify(input, null, 4);
-            else return JSON.stringify(input);
+            if (input.constructor.name.includes("Error") && input.stack) {
+                return input.stack;
+            } else {
+                if (longJSON) return JSON.stringify(input, null, 4);
+                else return JSON.stringify(input);
+            }
         }
         if (typeof(input) == "string") return input;
         if (typeof(input) == "function") return "(Function)";
