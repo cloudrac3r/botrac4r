@@ -223,5 +223,12 @@ module.exports = {
             const fullwidth = ["𝟢", "𝟣", "𝟤", "𝟥", "𝟦", "𝟧", "𝟨", "𝟩", "𝟪", "𝟫"];
             return fullwidth[number];
         }
+    },
+    argsToArray: function(input) {
+        let args = [];
+        Object.values(input).forEach(v => {
+            args.push(v);
+        });
+        return args;
     }
 }

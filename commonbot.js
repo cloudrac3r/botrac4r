@@ -18,6 +18,16 @@ module.exports = function(input) {
         if (!additional) additional = {};
         return {callback, additional};
     }
+    function createSendableObject(content, additional) {
+        if (!additional) additional = {};
+        if (typeof(content) == "string") {
+            return Object.assign({content}, additional);
+        } else if (typeof(content) == "object") {
+            return Object.assign({}, content, additional);
+        } else if (!content) {
+            return additional;
+        }
+    }
 
     let bf = {
         messageCharacterLimit: 2000,
@@ -72,7 +82,7 @@ module.exports = function(input) {
         userObject: function(thing) {
             if (!thing) return;
             if (typeof(thing) == "string") return bot.users.get(thing);
-            if (thing.constructor.name == "User" || thing.constructor.name == "Member") return thing;
+            if (thing.constructor.name.includes("User") || thing.constructor.name == "Member") return thing;
         },
         channelObject: function(thing) {
             if (!thing) return;
@@ -105,6 +115,14 @@ module.exports = function(input) {
                     resolve(undefined);
                 }
             });
+        },
+        withOptionalChannel: function(input) {
+            let args = cf.argsToArray(input);
+            return bf.resolveChannel(args[0])
+            .then(channel => new Promise(resolve => {
+                if (channel) args = args.slice(1);
+                resolve([channel].concat(args));
+            }));
         },
         // Given a user and a server, return the user's display name.
         userIDToNick: function(user, guild, prefer) {
@@ -154,7 +172,7 @@ module.exports = function(input) {
                     return input.name;
                 }
             } else if (typeof(input) == "string") {
-                let ceregex = /^<:([a-zA-Z_-]{2,32}):([0-9]+)>$/;
+                let ceregex = /^<a?:([a-zA-Z_-]{2,32}):([0-9]+)>$/;
                 let match = input.match(ceregex);
                 if (match) {
                     return match[1]+":"+match[2];
@@ -170,35 +188,29 @@ module.exports = function(input) {
         // Get a message from a channel.
         getMessage: function(channel, messageID, callback) {
             if (!callback) callback = new Function();
-            channel = channelObject(channel);
-            if (typeof(channelID) == "object") {
-                messageID = channelID.messageID;
-                channelID = channelID.channelID;
-            }
-            let cheat = bot.getChannel(channelID).messages.get(messageID);
+            channel = bf.channelObject(channel);
+            let cheat = channel.messages.get(messageID);
             if (cheat) {
                 callback(null, cheat);
-                return new Promise(resolve => {
-                    resolve(cheat);
-                });
+                return new Promise(resolve => resolve(cheat));
             } else {
-                let promise = bot.getMessage(channelID, messageID);
-                promise.then(messageObject => {
-                    bot.getChannel(channelID).messages.add(messageObject, undefined, true);
+                return bot.getMessage(channel.id, messageID)
+                .then(messageObject => {
+                    channel.messages.add(messageObject, undefined, true);
                     callback(null, messageObject);
                 });
-                return promise;
             }
         },
         // Send a message to a channel.
-        sendMessage: function(channel, message, c, a) {
+        sendMessage: function(channel, content, c, a) {
+            if (!content) content = "";
             let {callback, additional} = fixCAArgs({c, a});
             return new Promise(resolve => {
                 if (additional.mention) {
                     let mention = bf.userObject(additional.mention);
                     db.get("SELECT mention FROM Users WHERE userID = ?", mention.id, function(err, dbr) {
                         if (dbr && dbr.mention == 1) {
-                            message = mention.mention+message;
+                            content = mention.mention+content;
                         }
                         delete additional.mention;
                         resolve();
@@ -207,12 +219,12 @@ module.exports = function(input) {
             })
             .then(() => bf.resolveChannel(channel))
             .then(channel => {
-                let content = additional;
-                if (typeof(message) == "string") content.content = message;
-                let promise = channel.createMessage(content);
+                let promise = channel.createMessage(createSendableObject(content, additional));
                 promise.then(messageObject => {
+                    bot.getChannel(channel.id).messages.add(messageObject, undefined, true);
                     if (additional.legacy) callback(null, messageObject.id, messageObject);
                     else callback(null, messageObject);
+                    cf.log(`Sent a message (${messageObject.id}) to ${bf.nameOfChannel(channel)} (${channel.id}):\n${messageObject.content}`, "spam");
                 });
                 promise.catch(err => {
                     callback(err);
@@ -226,22 +238,16 @@ module.exports = function(input) {
         },
         // Edit a message sent by the bot.
         editMessage: function() {
-            let args = [];
-            Object.values(arguments).forEach(v => {
-                args.push(v);
-            });
-            return bf.resolveChannel(args[0])
-            .then(channel => {
-                if (channel) args = args.slice(1);
-                let [message, content, c, a] = args;
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, z, c, a]) => {
                 let {callback, additional} = fixCAArgs({c, a});
-                Object.assign(additional, {content});
+                content = createSendableObject(content, additional);
                 let promise;
                 if (channel) {
                     if (typeof(message) == "object") message = message.id;
-                    promise = bot.editMessage(channel.id, message, additional);
+                    promise = bot.editMessage(channel.id, message, content);
                 } else {
-                    promise = message.edit(additional);
+                    promise = message.edit(content);
                 }
                 promise.then(messageObject => callback(null, messageObject));
                 promise.catch(err => {
@@ -256,14 +262,8 @@ module.exports = function(input) {
         },
         // React to a message.
         addReaction: function() {
-            let args = [];
-            Object.values(arguments).forEach(v => {
-                args.push(v);
-            });
-            return bf.resolveChannel(args[0])
-            .then(channel => {
-                if (channel) args = args.slice(1);
-                let [message, reaction, callback] = args;
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, reaction, callback]) => {
                 if (!callback) callback = new Function();
                 reaction = bf.fixEmoji(reaction);
                 let promise;
@@ -273,18 +273,89 @@ module.exports = function(input) {
                 } else {
                     promise = message.addReaction(reaction);
                 }
-                promise.then(callback);
+                promise.then(() => {
+                    callback(null);
+                    cf.log(`Added the reaction ${reaction} to a message (${message}) in ${bf.nameOfChannel(channel)} (${channel.id})`, "spam");
+                });
                 promise.catch(err => {
                     callback(err);
                     switch (err.code) {
                     case 10014:
-                        cf.log(`Unknown emoji ${reaction} when adding reaction to ${message} in ${bf.nameOfChannel(channel.id)}`, "error");
+                        cf.log(`Unknown emoji ${reaction} when adding reaction to a message ${message} in ${bf.nameOfChannel(channel)} (${channel.id})`, "error");
                         break;
                     default:
                         throw err;
                     }
                 });
                 return promise;
+            });
+        },
+        // Add multiple reactions to a message, in order.
+        addReactions: function(channel, message, reactions, callback) {
+            (function addNextReaction() {
+                bf.addReaction(channel, message, reactions[0]).then(() => {
+                    reactions.shift();
+                    if (reactions[0]) addNextReaction();
+                    else callback(null);
+                }).catch(err => {
+                    callback(err);
+                    throw err;
+                });
+            })();
+        },
+        // Remove a reaction from a message.
+        removeReaction: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, reaction, user, callback]) => {
+                user = user ? bf.userObject(user) : bot.user;
+                if (!callback) callback = new Function();
+                reaction = bf.fixEmoji(reaction);
+                let promise;
+                if (channel) {
+                    if (typeof(message) == "object") message = message.id;
+                    promise = bot.removeMessageReaction(channel.id, message, reaction, user.id);
+                } else {
+                    promise = message.removeReaction(reaction, user);
+                }
+                promise.then(() => {
+                    callback(null);
+                    cf.log(`Removed the reaction ${reaction} from a message (${message}) in ${bf.nameOfChannel(channel)} (${channel.id})`, "spam");
+                });
+                promise.catch(err => {
+                    callback(err);
+                    switch (err.code) {
+                    case 10014:
+                        cf.log(`Unknown emoji ${reaction} when removing reaction from ${message} in ${bf.nameOfChannel(channel)} (${channel.id})`, "error");
+                        break;
+                    default:
+                        throw err;
+                    }
+                });
+                return promise;
+            });
+        },
+        // Remove multiple reactions from a message.
+        removeReactions: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, reactions, users, callback]) => {
+                if (reactions) reactions = reactions.map(r => bf.fixEmoji(r));
+                if (!callback) callback = new Function();
+                console.log(message);
+                return new Promise(resolve => {
+                    if (typeof(message) == "object") resolve(message);
+                    else bf.getMessage(channel, message).then(resolve);
+                }).then(message => {
+                    // Now we are guaranteed to have a message object as efficiently as possible.
+                    let todo = [];
+                    Object.keys(message.reactions).filter(r => !reactions || reactions.includes(r)).forEach(r => {
+                        message.getReaction(r).then(reacters => reacters.forEach(u => {
+                            if (!users || users.includes(u)) todo.push(bf.removeReaction(message, r));
+                        }));
+                    });
+                    return Promise.all(todo).then(() => {
+                        callback();
+                    });
+                });
             });
         }
     }

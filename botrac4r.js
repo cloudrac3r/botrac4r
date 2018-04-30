@@ -21,6 +21,9 @@ let modules = [ // Load these modules on startup and on change
         filename: __dirname+"/names.js",
         dest: "bot framework"
     }/*,{
+        filename: __dirname+"/remind.js",
+        dest: "bot commands"
+    }/*,{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
     },{
@@ -52,9 +55,6 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot commands"
     },{
         filename: __dirname+"/spoiler.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/remind.js",
         dest: "bot commands"
     }*/
 ];
@@ -140,15 +140,15 @@ bot.once("ready", function() { // Once the bot connects
     log(`Logged in as ${bot.user.username} (${bot.user.id})`, "info");
 });
 
-bot.on("legacyMessage", function(user, userID, channelID, message, event) {
-    if (!bot.users.get(userID)) return; // Ignore "fake users"
-    if (bot.users.get(userID).bot) return; // Ignore other bots
+bot.on("messageCreate", function(msg) {
+    let message = msg.content;
+    if (!bot.users.get(msg.author.id)) return; // Ignore "fake users"
+    if (msg.author.bot) return; // Ignore other bots
     if (message == defaultPrefix+"configure") {
-        bc.setup.code(userID, channelID, "", event.d);
+        bc.setup.code(msg.author.id, msg.channel.id, "", msg);
         return;
     }
-    let data = event.d;
-    db.get("SELECT * FROM Users WHERE userID = ?", userID, function(err, dbr) {
+    db.get("SELECT * FROM Users WHERE userID = ?", msg.author.id, function(err, dbr) {
         if (!dbr) {
             //bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, isRegex: 0, seperator: defaultSeperator, altSeperator: defaultAltSplit};
@@ -163,31 +163,34 @@ bot.on("legacyMessage", function(user, userID, channelID, message, event) {
             if (message.startsWith(prefix)) mp = message.slice(prefix.length).split(seperator);
         }
         if (mp) {
-            for (let c in bc) { // Find a bot command whose alias matches
-                if (bc[c].aliases.includes(mp[0])) {
-                    bc[c].code(userID, channelID, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data); // Call it
+            Object.values(bc).forEach(command => { // Find a bot command whose alias matches
+                if (command.aliases.includes(mp[0])) {
+                    if (command.eris) {
+                        command.code(msg, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]));
+                    } else {
+                        command.code(msg.author.id, msg.channel, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data);
+                    }
                 }
-            }
+            });
             if (mp[0] == "help") { // Exclusive help command because reasons
                 let target;
                 if (mp[1]) target = Object.keys(bc).map(c => bc[c]).filter(c => c.aliases.includes(mp[1]))[0];
                 if (target) {
-                    bf.sendMessage(channelID, `**${target.shortHelp}**\n`+
-                                              `**Aliases**: ${target.aliases.join(", ")}\n`+
-                                              `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
-                                              (target.longHelp ? "\n\n"+target.longHelp : ""));
+                    bf.sendMessage(msg.channel, `**${target.shortHelp}**\n`+
+                                                `**Aliases**: ${target.aliases.join(", ")}\n`+
+                                                `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
+                                                (target.longHelp ? "\n\n"+target.longHelp : ""));
                 } else {
-                    if (!bot.isDMChannel(channelID)) bf.sendMessage(channelID, "DM sent.");
-                    bf.sendMessage(userID, bot.username+" uses things called *flags* and *switches*. "+
-                                           "These are to make it easier for you to specify options in your command without having to remember which order the options must be given in.\n"+
-                                           "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a feature.\n"+
-                                           "Switches are used by prefixing a word with another word connected with an equals sign, e.g. `size=4`. This allows you to specify that option anywhere in the command.\n"+
-                                           "If you don't want to use flags or switches, you can usually use positional arguments instead.", function() {
-                        bf.sendMessage(userID, "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
-                            Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
-                            Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
-                        ], ["left", "left"])+"```");
-                    });
+                    if (!bf.isDMChannel(msg.channel)) bf.sendMessage(msg.channel, "DM sent.");
+                    bf.sendMessage(msg.author.id, bot.user.username+" uses things called *flags* and *switches*. "+
+                                                "These are to make it easier for you to specify options in your command without having to remember which order the options must be given in.\n"+
+                                                "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a feature.\n"+
+                                                "Switches are used by prefixing a word with another word connected with an equals sign, e.g. `size=4`. This allows you to specify that option anywhere in the command.\n"+
+                                                "If you don't want to use flags or switches, you can usually use positional arguments instead.")
+                    .then(() => bf.sendMessage(msg.author.id, "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
+                        Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
+                        Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
+                    ], ["left", "left"])+"```"));
                 }
             }
         }
@@ -195,8 +198,3 @@ bot.on("legacyMessage", function(user, userID, channelID, message, event) {
 });
 
 bot.connect();
-
-bot.on("disconnect", function(err, code) {
-    log("Disconnected from Discord ("+err+code+"), will reconnect automatically.", "info");
-    bot.connect();
-});

@@ -57,7 +57,8 @@ module.exports = function(input) {
             longHelp: 'Time input is formatted as sets of numbers followed by a single letter from (w, d, h, m, s).\n'+
                       'For example, `1d 6h 30m walk the dog` would set a reminder for 1 day, 6 hours and 30 minutes from now with the text "walk the dog".',
             reference: "*time* *text to be reminded about*",
-            code: function(userID, channelID, command, d) {
+            eris: true,
+            code: function(msg, command) {
                 let time = Date.now();
                 let words = command.regularWords.map(w => w.toLowerCase());
                 let textTime = [];
@@ -66,22 +67,21 @@ module.exports = function(input) {
                 while (w && w.match(/^\d+[wdhms]$/)) {
                     valid = true;
                     textTime.push(w);
-                    let [number, letter] = w.match(/^(\d+)([wdhms])$/).slice(1);
+                    let [number,letter] = w.match(/^(\d+)([wdhms])$/).slice(1);
                     time += number*timeMultipliers[letter];
                     words.shift();
                     w = words[0];
                 }
                 if (valid) {
-                    let receiveChannel = bot.isDMChannel(channelID) ? userID : channelID;
-                    db.run("INSERT INTO Reminders VALUES (NULL, ?, ?, ?, ?, ?, ?)", [userID, receiveChannel, d.id, words.join(command.split), time, textTime.join(" ")], err => {
+                    db.run("INSERT INTO Reminders VALUES (NULL, ?, ?, ?, ?, ?, ?)", [msg.author.id, msg.channel.id, msg.id, words.join(command.split), time, textTime.join(" ")], err => {
                         db.get("SELECT seq FROM sqlite_sequence WHERE name='Reminders'", (err, dbr) => {
                             if (err) throw err;
-                            addReminder({userID, channelID, messageID: d.id, text: words.join(command.split), time, id: dbr.seq, textTime: textTime.join(" ")});
-                            bf.addReaction(channelID, d.id, bf.buttons["green tick"]);
+                            addReminder({user: msg.author, channel: msg.channel.id, messageID: msg.id, text: words.join(command.split), time, id: dbr.seq, textTime: textTime.join(" ")});
+                            bf.addReaction(msg, bf.buttons["green tick"]);
                         });
                     });
                 } else {
-                    bf.sendMessage(channelID, "You need to specify when to set the reminder for. Try `"+command.prefix+"help "+command.name+"` for more info.", {mention: userID});
+                    bf.sendMessage(channelID, "You need to specify when to set the reminder for. Try `"+command.prefix+"help "+command.name+"` for more info.", {mention: msg.author.id});
                 }
             }
         }
