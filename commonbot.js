@@ -1,6 +1,9 @@
 const events = require("events");
 const userEmojiMessage = {channelID: "434994415342321674", messageID: "434994502848217099"};
 
+let reactionMenus = {};
+let messageMenus = [];
+
 module.exports = function(input) {
     let {bot, cf, db, reloadEvent} = input;
     let userEmojis = {};
@@ -120,8 +123,12 @@ module.exports = function(input) {
             let args = cf.argsToArray(input);
             return bf.resolveChannel(args[0])
             .then(channel => new Promise(resolve => {
-                if (channel) args = args.slice(1);
-                resolve([channel].concat(args));
+                if (!args[0]) {
+                    resolve(args);
+                } else {
+                    if (channel) args = args.slice(1);
+                    resolve([channel].concat(args));
+                }
             }));
         },
         // Given a user and a server, return the user's display name.
@@ -157,6 +164,8 @@ module.exports = function(input) {
                 }
             } else if (userObject) {
                 return "@"+userObject.username;
+            } else if (!input) {
+                return "unknown channel";
             } else {
                 console.log(input);
                 console.log(typeof(input));
@@ -172,7 +181,7 @@ module.exports = function(input) {
                     return input.name;
                 }
             } else if (typeof(input) == "string") {
-                let ceregex = /^<a?:([a-zA-Z_-]{2,32}):([0-9]+)>$/;
+                let ceregex = /^<a?:([a-zA-Z0-9_-]{2,32}):([0-9]+)>$/;
                 let match = input.match(ceregex);
                 if (match) {
                     return match[1]+":"+match[2];
@@ -185,20 +194,31 @@ module.exports = function(input) {
                 throw "Unknown format for emoji; cannot convert";
             }
         },
+        addTemporaryListener: function(target, name, filename, code) {
+            target.on(name, code);
+            reloadEvent.once(filename, () => {
+                target.removeListener(name, code);
+            });
+        },
         // Get a message from a channel.
         getMessage: function(channel, messageID, callback) {
             if (!callback) callback = new Function();
-            channel = bf.channelObject(channel);
-            let cheat = channel.messages.get(messageID);
-            if (cheat) {
-                callback(null, cheat);
-                return new Promise(resolve => resolve(cheat));
+            if (typeof(messageID) == "object") {
+                return Promise.resolve(messageID)
             } else {
-                return bot.getMessage(channel.id, messageID)
-                .then(messageObject => {
-                    channel.messages.add(messageObject, undefined, true);
-                    callback(null, messageObject);
-                });
+                channel = bf.channelObject(channel);
+                let cheat = channel.messages.get(messageID);
+                if (cheat) {
+                    callback(null, cheat);
+                    return Promise.resolve(cheat);
+                } else {
+                    return bot.getMessage(channel.id, messageID)
+                    .then(messageObject => {
+                        channel.messages.add(messageObject, undefined, true);
+                        callback(null, messageObject);
+                        return messageObject;
+                    });
+                }
             }
         },
         // Send a message to a channel.
@@ -210,7 +230,7 @@ module.exports = function(input) {
                     let mention = bf.userObject(additional.mention);
                     db.get("SELECT mention FROM Users WHERE userID = ?", mention.id, function(err, dbr) {
                         if (dbr && dbr.mention == 1) {
-                            content = mention.mention+content;
+                            content = mention.mention+" "+content;
                         }
                         delete additional.mention;
                         resolve();
@@ -219,21 +239,21 @@ module.exports = function(input) {
             })
             .then(() => bf.resolveChannel(channel))
             .then(channel => {
-                let promise = channel.createMessage(createSendableObject(content, additional));
-                promise.then(messageObject => {
+                return channel.createMessage(createSendableObject(content, additional))
+                .then(messageObject => {
+                    cf.log(`Sent a message (${messageObject.id}) to ${bf.nameOfChannel(channel)} (${channel.id}):\n${messageObject.content}`, "spam");
                     bot.getChannel(channel.id).messages.add(messageObject, undefined, true);
                     if (additional.legacy) callback(null, messageObject.id, messageObject);
                     else callback(null, messageObject);
-                    cf.log(`Sent a message (${messageObject.id}) to ${bf.nameOfChannel(channel)} (${channel.id}):\n${messageObject.content}`, "spam");
-                });
-                promise.catch(err => {
+                    return messageObject;
+                })
+                .catch(err => {
                     callback(err);
                     switch (err.code) {
                     default:
                         throw err;
                     }
                 });
-                return promise;
             });
         },
         // Edit a message sent by the bot.
@@ -271,10 +291,15 @@ module.exports = function(input) {
                     if (typeof(message) == "object") message = message.id;
                     promise = bot.addMessageReaction(channel.id, message, reaction);
                 } else {
-                    promise = message.addReaction(reaction);
+                    if (message.reactions[reaction] && message.reactions[reaction].me) {
+                        promise = Promise.resolve();
+                    } else {
+                        promise = message.addReaction(reaction);
+                    }
                 }
                 promise.then(() => {
                     callback(null);
+                    if (typeof(message) == "object") channel = message.channel;
                     cf.log(`Added the reaction ${reaction} to a message (${message}) in ${bf.nameOfChannel(channel)} (${channel.id})`, "spam");
                 });
                 promise.catch(err => {
@@ -291,34 +316,42 @@ module.exports = function(input) {
             });
         },
         // Add multiple reactions to a message, in order.
-        addReactions: function(channel, message, reactions, callback) {
-            (function addNextReaction() {
-                bf.addReaction(channel, message, reactions[0]).then(() => {
-                    reactions.shift();
-                    if (reactions[0]) addNextReaction();
-                    else callback(null);
-                }).catch(err => {
-                    callback(err);
-                    throw err;
-                });
-            })();
+        addReactions: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, reactions, callback]) => new Promise(resolve => {
+                if (!callback) callback = new Function();
+                (function addNextReaction() {
+                    bf.addReaction(channel, message, reactions[0]).then(() => {
+                        reactions.shift();
+                        if (reactions[0]) addNextReaction();
+                        else {
+                            callback(null);
+                            resolve();
+                        }
+                    }).catch(err => {
+                        callback(err);
+                        throw err;
+                    });
+                })();
+            }));
         },
         // Remove a reaction from a message.
         removeReaction: function() {
             return bf.withOptionalChannel(arguments)
             .then(([channel, message, reaction, user, callback]) => {
-                user = user ? bf.userObject(user) : bot.user;
+                user = user ? bf.userObject(user).id : undefined;
                 if (!callback) callback = new Function();
                 reaction = bf.fixEmoji(reaction);
                 let promise;
                 if (channel) {
                     if (typeof(message) == "object") message = message.id;
-                    promise = bot.removeMessageReaction(channel.id, message, reaction, user.id);
+                    promise = bot.removeMessageReaction(channel.id, message, reaction, user);
                 } else {
                     promise = message.removeReaction(reaction, user);
                 }
                 promise.then(() => {
                     callback(null);
+                    if (typeof(message) == "object") channel = message.channel;
                     cf.log(`Removed the reaction ${reaction} from a message (${message}) in ${bf.nameOfChannel(channel)} (${channel.id})`, "spam");
                 });
                 promise.catch(err => {
@@ -340,7 +373,7 @@ module.exports = function(input) {
             .then(([channel, message, reactions, users, callback]) => {
                 if (reactions) reactions = reactions.map(r => bf.fixEmoji(r));
                 if (!callback) callback = new Function();
-                console.log(message);
+                if (users) users = users.map(u => bf.userObject(u).id);
                 return new Promise(resolve => {
                     if (typeof(message) == "object") resolve(message);
                     else bf.getMessage(channel, message).then(resolve);
@@ -349,7 +382,7 @@ module.exports = function(input) {
                     let todo = [];
                     Object.keys(message.reactions).filter(r => !reactions || reactions.includes(r)).forEach(r => {
                         message.getReaction(r).then(reacters => reacters.forEach(u => {
-                            if (!users || users.includes(u)) todo.push(bf.removeReaction(message, r));
+                            if (!users || users.includes(u.id)) todo.push(message.removeReaction(r, u.id));
                         }));
                     });
                     return Promise.all(todo).then(() => {
@@ -357,8 +390,141 @@ module.exports = function(input) {
                     });
                 });
             });
+        },
+        // Create a reaction menu
+        reactionMenu: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, actions, callback]) => {
+                if (!callback) callback = new Function();
+                actions = actions.map(a => {
+                    a.emoji = bf.fixEmoji(a.emoji);
+                    if (a.allowedUsers) a.allowedUsers = a.allowedUsers.map(u => bf.userObject(u).id);
+                    return a;
+                });
+                return new Promise(resolve => {
+                    if (typeof(message) == "object") resolve(message);
+                    else if (channel && typeof(message) == "string" && message.match(/^[0-9]{16,}$/)) {
+                        resolve(message);
+                    } else if (channel && typeof(message) == "string") {
+                        bf.sendMessage(channel, message).then(resolve);
+                    }
+                }).then(message => {
+                    let messageID = (typeof(message) == "string" ? message : message.id);
+                    let channelID = (typeof(message) == "object" ? message.channel.id : channel.id);
+                    bf.getMessage(channel, message).then(msg => callback(null, msg));
+                    let promise;
+                    if (channel) {
+                        promise = bf.addReactions(channel, message, actions.map(a => a.emoji));
+                    } else {
+                        promise = bf.addReactions(message, actions.map(a => a.emoji));
+                    }
+                    reactionMenus[messageID] = {actions, channelID};
+                    cf.log(reactionMenus, "warning");
+                    promise.then(() => {
+                        callback(null);
+                    });
+                    promise.catch(() => {
+                        delete reactionMenus[messageID];
+                    });
+                    return promise;
+                });
+            });
+        },
+        // Create a message menu
+        messageMenu: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, user, pattern, action, callback]) => {
+                if (!callback) callback = new Function();
+                if (!pattern) pattern = /.*/;
+                return new Promise(resolve => {
+                    if (typeof(message) == "object") resolve(message);
+                    else if (channel && typeof(message) == "string" && message.match(/^[0-9]{16,}$/)) {
+                        resolve(message);
+                    } else if (channel && typeof(message) == "string") {
+                        bf.sendMessage(channel, message).then(resolve);
+                    }
+                }).then(message => {
+                    let messageID = (typeof(message) == "string" ? message : message.id);
+                    let channelID = (typeof(message) == "object" ? message.channel.id : channel.id);
+                    let userID = bf.userObject(user).id;
+                    messageMenus = messageMenus.filter(m => !(m.channelID == channelID && m.messageID == messageID));
+                    messageMenus.push({channelID, userID, pattern, action});
+                    callback(null);
+                });
+            });
         }
     }
+
+    bf.addTemporaryListener(bot, "messageReactionAdd", __filename, (msg, emoji, user) => {
+        user = bf.userObject(user);
+        emoji = bf.fixEmoji(emoji);
+        if (user.id == bot.user.id) return;
+        let menu = reactionMenus[msg.id];
+        if (!menu) return;
+        let action = menu.actions.find(a => a.emoji == emoji);
+        if (!action) return;
+        if (action.allowedUsers && !action.allowedUsers.includes(user.id)) {
+            if (action.remove == "user") bf.removeReaction(msg, emoji, user);
+            return;
+        }
+        switch (action.actionType) {
+        case "reply":
+            bf.sendMessage(msg.channel, action.actionData, {mention: user});
+            break;
+        case "edit":
+            bf.editMessage(msg, action.actionData);
+            break;
+        case "legacy":
+            action.actionData({d: msg}, reactionMenus);
+            break;
+        case "js":
+            action.actionData(msg, reactionMenus);
+            break;
+        }
+        switch (action.ignore) {
+        case "that":
+            menu.actions.find(a => a.emoji == emoji).actionType = "none";
+            break;
+        case "thatTotal":
+            menu.actions = menu.actions.filter(a => a.emoji != emoji);
+            break;
+        case "all":
+            menu.actions.forEach(a => a.actionType = "none");
+            break;
+        case "total":
+            delete reactionMenus[msg.id];
+            break;
+        }
+        switch (action.remove) {
+        case "user":
+            bf.removeReaction(msg, emoji, user);
+            break;
+        case "bot":
+            bf.removeReaction(msg, emoji, bot.user);
+            break;
+        case "that":
+            bf.removeReactions(msg, [emoji]);
+            break;
+        case "all":
+            msg.removeReactions();
+            break;
+        case "message":
+            delete reactionMenus[msg.id];
+            msg.delete();
+            break;
+        }
+        //cf.log("New reaction on reaction menu: "+emoji, "warning");
+    });
+    bf.addTemporaryListener(bot, "messageCreate", __filename, msg => {
+        function isDesiredMenu(m) {
+            return m.channelID == msg.channel.id && m.userID == msg.author.id;
+        }
+        let menu = messageMenus.find(m => isDesiredMenu(m) && msg.content.match(m.pattern));
+        if (menu) {
+            menu.action(msg);
+            messageMenus = messageMenus.filter(m => !isDesiredMenu(m));
+        }
+    });
 
     return bf;
 };

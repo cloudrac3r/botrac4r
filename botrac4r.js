@@ -145,7 +145,7 @@ bot.on("messageCreate", function(msg) {
     if (!bot.users.get(msg.author.id)) return; // Ignore "fake users"
     if (msg.author.bot) return; // Ignore other bots
     if (message == defaultPrefix+"configure") {
-        bc.setup.code(msg.author.id, msg.channel.id, "", msg);
+        bc.setup.code(msg);
         return;
     }
     db.get("SELECT * FROM Users WHERE userID = ?", msg.author.id, function(err, dbr) {
@@ -168,7 +168,7 @@ bot.on("messageCreate", function(msg) {
                     if (command.eris) {
                         command.code(msg, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]));
                     } else {
-                        command.code(msg.author.id, msg.channel, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), data);
+                        command.code(msg.author.id, msg.channel, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), {d: msg});
                     }
                 }
             });

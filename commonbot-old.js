@@ -238,7 +238,7 @@ module.exports = function(input) {
             */
         },
         // React to a message.
-        addReaction: function(channelID, message, reaction, callback, RSRBcheck) { //TODO: rewrite entire function: bot.addMessageReaction
+        addReaction: function(channelID, message, reaction, callback, RSRBcheck) {
             if (!channelID) {
                 cf.log("Need a channelID to react in", "warning");
                 return;
@@ -633,7 +633,7 @@ module.exports = function(input) {
 
     // Make reaction menus work
     bot.on("legacyMessageReactionAdd", reactionMenuHandler);
-    function reactionMenuHandler(event) { // TODO: Rewrite with Eris
+    function reactionMenuHandler(event) {
         if (event.d.user_id == bot.user.id) return;
         //cf.log(event, "info");
         if (reactionMenus[event.d.message_id]) {
@@ -696,7 +696,7 @@ module.exports = function(input) {
     }
     // Make message menus work
     bot.on("legacyMessage", messageMenuHandler);
-    function messageMenuHandler(user, userID, channelID, message, event) { //TODO: Rewrite with Eris
+    function messageMenuHandler(user, userID, channelID, message, event) {
         let menu = messageMenus.filter(m => m.channelID == channelID && m.userID == userID && message.match(m.pattern))[0];
         if (menu) {
             menu.action(message, event);

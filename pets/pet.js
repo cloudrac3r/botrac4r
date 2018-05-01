@@ -93,7 +93,6 @@ module.exports = function(input) {
                         {emoji: bf.buttons["3"], remove: "user", allowedUsers: [this.userID], actionType: "js", actionData: () => {
                         }}
                     ]);
-                    //TODO: action handler
                 });
             });
             if (callback) saveData(callback);
@@ -337,7 +336,7 @@ module.exports = function(input) {
             reference: "",
             longHelp: "",
             code: function(userID, channelID, command, d) {
-                if (channelID != petIDs.channel) return; //TODO
+                if (channelID != petIDs.channel) return;
                 if (command.regularWords[0] == "reset" && channelID == petIDs.channel) {
                     bot.getMessages({channelID: petIDs.channel}, function(e,a) {
                         bot.deleteMessages({channelID: petIDs.channel, messageIDs: a.map(m => m.id)}, function(err) {
