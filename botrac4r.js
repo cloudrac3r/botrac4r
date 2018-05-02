@@ -29,6 +29,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/pinarchive/pinarchive.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/spoiler.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
@@ -52,9 +55,6 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot commands"
     },{
         filename: __dirname+"/images.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/spoiler.js",
         dest: "bot commands"
     }*/
 ];

@@ -435,13 +435,13 @@ module.exports = function(input) {
                         promise = bf.addReactions(message, actions.map(a => a.emoji));
                     }
                     reactionMenus[messageID] = {actions, channelID};
-                    promise.then(() => {
-                        callback(null);
-                    });
                     promise.catch(() => {
                         delete reactionMenus[messageID];
                     });
-                    return promise;
+                    return promise.then(() => {
+                        callback(null, message);
+                        return Promise.resolve(message);
+                    });
                 });
             });
         },
@@ -521,7 +521,7 @@ module.exports = function(input) {
             });
         }
     }
-
+    // Make reaction menus work
     bf.addTemporaryListener(bot, "messageReactionAdd", __filename, (msg, emoji, user) => {
         user = bf.userObject(user);
         emoji = bf.fixEmoji(emoji);
@@ -545,7 +545,7 @@ module.exports = function(input) {
             action.actionData({d: msg}, reactionMenus);
             break;
         case "js":
-            action.actionData(msg, reactionMenus);
+            action.actionData(msg, emoji, user, reactionMenus);
             break;
         }
         switch (action.ignore) {
