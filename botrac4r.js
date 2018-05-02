@@ -35,11 +35,11 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/images.js",
         dest: "bot commands"
-    }/*,{
-        filename: __dirname+"/onuw.js",
-        dest: "bot commands"
     },{
         filename: __dirname+"/timezone/timezone.js",
+        dest: "bot commands"
+    }/*,{
+        filename: __dirname+"/onuw.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/pets/pet.js",
