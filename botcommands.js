@@ -1,3 +1,5 @@
+let Canvas = require("canvas");
+
 module.exports = function(input) {
     let {bot, cf, bf, db} = input;
     const prettyMs = require("pretty-ms");
@@ -315,6 +317,35 @@ module.exports = function(input) {
                     }
                 }
                 bf.addReactions(msg, reactions);
+            }
+        },
+        "colour": {
+            aliases: ["colour", "color"],
+            shortHelp: "Display a colour or get a random one",
+            reference: "[*colour*]",
+            longHelp: "Specify a colour as a hex value to display it. Alternatively, don't specify a colour to get a random one.",
+            eris: true,
+            code: function(msg, command) {
+                let canvas = new Canvas(200, 200);
+                let ctx = canvas.getContext("2d");
+                let colour;
+                if (command.regularWords[0].match(/^#?([A-Fa-f0-9]{3}){1,2}$/)) {
+                    colour = command.regularWords[0].toLowerCase().replace("#", "");
+                    if (colour.length == 3) colour = [...colour].map(c => c.repeat(2)).join("");
+                } else {
+                    colour = Math.floor(Math.random()*0x1000000).toString(16).padStart(6, "0");
+                }
+                if (colour.includes("dab")) {
+                    if (Math.random() < 0.95) {
+                        colour = colour.replace(/dab/g, "bad"); 
+                    } else {
+                        bf.sendMessage(msg.channel, "omg dab", {embed: {image: {url: "https://cdn.discordapp.com/attachments/160197704226439168/441052899041345557/emoji.png"}}});
+                    }
+                }
+                ctx.fillStyle = "#"+colour;
+                ctx.fillRect(0, 0, 200, 200);
+                let buffer = canvas.toBuffer();
+                bf.sendMessage(msg.channel, "#"+colour, {file: buffer, filename: colour+".png", mention: msg.author});
             }
         }
     };
