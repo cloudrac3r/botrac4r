@@ -7,20 +7,21 @@ module.exports = function(input) {
             shortHelp: "Post an image of spaaaaaaaaace",
             reference: "",
             longHelp: "",
-            code: function(userID, channelID, command, d) {
-                bot.simulateTyping(channelID);
+            eris: true,
+            code: function(msg) {
+                bot.sendChannelTyping(msg.channel.id);
                 request("https://api.cheweybot.ga/space", (e,r,b) => {
                     try {
                         let url = JSON.parse(b).data;
                         if (!url) throw "SyntaxError: data is undefined";
-                        bf.sendMessage(channelID, "", {mention: userID, embed: {
+                        bf.sendMessage(msg.channel, {mention: msg.author, embed: {
                             title: "Sp"+"a".repeat(Math.floor(Math.random()*24+6))+"ce"+"!".repeat(Math.round(Math.random()*2)),
                             image: {url: encodeURI(url)},
-                            color: bot.isDMChannel(channelID) ? 0x5c53d4 : bf.userIDToColour(bot.user.id, bot.channelGuildMap[channelID])
+                            color: bf.isDMChannel(msg.channel) ? 0x5c53d4 : bf.userToColour(bot.user, bot.channelGuildMap[msg.channel.id])
                         }});
                     } catch (e) {
                         if (e.toString().match(/^SyntaxError.*JSON/) || e.toString() == "SyntaxError: data is undefined") {
-                            bf.sendMessage(channelID, "API returned invalid data.", {mention: userID});
+                            bf.sendMessage(msg.channel, "API returned invalid data.", {mention: msg.author});
                         } else {
                             throw e;
                         }
