@@ -136,9 +136,10 @@ module.exports = function(input) {
             }));
         },
         // Given a user and a server, return the user's display name.
-        userIDToNick: function(user, guild, prefer) {
+        userToNick: function(user, guild, prefer) {
             if (!prefer) prefer = "";
             user = bf.userObject(user);
+            let username = user.username;
             let nick = bf.userToMember(user, guild).nick;
             if (!nick) return username; // No nick? Use username.
             if (prefer.startsWith("user")) { // User(name) should be first
@@ -200,7 +201,9 @@ module.exports = function(input) {
         },
         addTemporaryListener: function(target, name, filename, code) {
             target.on(name, code);
+            cf.log("Added listener: "+name, "spam");
             reloadEvent.once(filename, () => {
+                cf.log("Removed listener: "+name, "spam");
                 target.removeListener(name, code);
             });
         },

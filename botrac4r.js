@@ -26,11 +26,11 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/remind.js",
         dest: "bot commands"
-    }/*,{
-        filename: __dirname+"/onuw.js",
-        dest: "bot commands"
     },{
         filename: __dirname+"/pinarchive/pinarchive.js",
+        dest: "bot commands"
+    }/*,{
+        filename: __dirname+"/onuw.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/timezone/timezone.js",

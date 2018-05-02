@@ -7,12 +7,6 @@ module.exports = function(input) {
     let selfUnpin = [];
     let ignoredMessages = [];
     let unpinTimeout = 1000;
-    bot.on("legacyMessage", messageEvent);
-    bot.on("any", messageUpdateEvent);
-    reloadEvent.once(__filename, function() {
-        bot.removeListener("legacyMessage", messageEvent);
-        bot.removeListener("any", messageUpdateEvent);
-    });
     reloadEvent.on("pinarchive ignore", info => {
         ignoredMessages.push(info);
     });
@@ -33,55 +27,55 @@ module.exports = function(input) {
             }
         });
     }
-    function messageEvent(user, userID, channelID, message, event) {
-        if (event.d.type == 6 && bot.channels.get(channelID)) {
+    bf.addTemporaryListener(bot, "messageCreate", __filename, messageEvent);
+    function messageEvent(msg) {
+        let channelID = msg.channel.id;
+        let userID = msg.author.id;
+        if (msg.type == 6 && bf.channelObject(channelID)) {
             getPinChannel(channelID, function(target, dbr, cdbr) {
                 if (target) {
                     cf.log("Pin posting", "info");
                     gpm();
                     function gpm() {
-                        bot.getPinnedMessages({channelID: channelID}, function(e,a) {
-                            if (ignoredMessages.find(m => m.messageID == a[0].id && m.channelID == a[0].channel_id)) return;
-                            else if (e && e.statusCode == 429) {
-                                setTimeout(gpm, e.response.retry_after);
-                            } else if (a && a[0]) {
-                                bot.getMessage({channelID: channelID, messageID: a[0].id}, function(e,r) {
-                                    r.attachments.push({});
-                                    r.embeds.push({});
-                                    bf.sendMessage(target, "", function(e, id) {
-                                        if (e) {
-                                            cf.log(e, "error");
-                                        } else {
-                                            bf.reactionMenu(channelID, "OK! That pin has been sent to <#"+target+">.", [
-                                                {emoji: bf.buttons["times"], allowedUsers: [userID], ignore: "total", remove: "message", actionType: "js", actionData: () => {
-                                                    bot.deleteMessage({channelID: target, messageID: id}, (e) => {
-                                                        if (!e) bf.sendMessage(channelID, "Pin archive message manually removed.");
-                                                    });
-                                                }}
-                                            ]);
-                                        }
-                                    }, {embed: {
-                                        author: {
-                                            name: bf.userIDToNick(r.author.id, bot.channelGuildMap[channelID], "username"),
-                                            icon_url: "https://cdn.discordapp.com/avatars/"+r.author.id+"/"+bot.users.get(r.author.id).avatar+".jpg"
-                                        },
-                                        color: bf.userIDToColour(r.author.id, bot.channelGuildMap[channelID]),
-                                        description: r.content,
-                                        image: {
-                                            url: r.attachments[0].url || r.embeds[0].url
-                                        },
-                                        footer: {
-                                            text: (cdbr.name || "#"+bot.channels.get(r.channel_id).name)+" | "+r.id+" | pinned by "+bot.users.get(userID).username
-                                        },
-                                        timestamp: new Date(r.timestamp).toJSON()
-                                    }});
+                        bot.getPins(channelID).then(a => {
+                            if (ignoredMessages.find(m => m.messageID == a[0].id && m.channelID == a[0].channel.id)) return;
+                            else if (a && a[0]) {
+                                let r = a[0];
+                                r.attachments.push({});
+                                r.embeds.push({});
+                                bf.sendMessage(target, {embed: {
+                                    author: {
+                                        name: bf.userToNick(r.author, bot.channelGuildMap[channelID], "username"),
+                                        icon_url: "https://cdn.discordapp.com/avatars/"+r.author.id+"/"+r.author.avatar+".jpg"
+                                    },
+                                    color: bf.userToColour(r.author, bot.channelGuildMap[channelID]),
+                                    description: r.content,
+                                    image: {
+                                        url: r.attachments[0].url || r.embeds[0].url
+                                    },
+                                    footer: {
+                                        text: (cdbr.name || "#"+r.channel.name)+" | "+r.id+" | pinned by "+bf.userObject(userID).username
+                                    },
+                                    timestamp: new Date(r.timestamp).toJSON()
+                                }}, function(e, id) {
+                                    if (e) {
+                                        cf.log(e, "error");
+                                    } else {
+                                        bf.reactionMenu(channelID, "OK! That pin has been sent to <#"+target+">.", [
+                                            {emoji: bf.buttons["times"], allowedUsers: [userID], ignore: "total", remove: "message", actionType: "js", actionData: () => {
+                                                bf.getMessage(target, id).then(msg => msg.delete().then(() => {
+                                                    if (!e) bf.sendMessage(channelID, "Pin archive message manually removed.");
+                                                }));
+                                            }}  
+                                        ]);
+                                    }
                                 });
                                 if (dbr.maxPins) {
                                     if (a.length > dbr.maxPins) {
                                         bf.sendMessage(channelID, "To make space for more pins, I unpinned the oldest pinned message in this channel.");
                                         let toRemove = a[a.length-1].id;
                                         selfUnpin.push(toRemove);
-                                        bot.deletePinnedMessage({channelID: channelID, messageID: toRemove});
+                                        bf.unpinMessage(channelID, toRemove);
                                     }
                                 }
                             } else {
@@ -93,6 +87,7 @@ module.exports = function(input) {
             });
         }
     }
+    bf.addTemporaryListener(bot, "rawWS", __filename, messageUpdateEvent);
     function messageUpdateEvent(event) {
         if (!event.d) return;
         if (event.t == "MESSAGE_UPDATE") {
@@ -115,24 +110,24 @@ module.exports = function(input) {
         }
     }
     function somethingWasUnpinned(channelID, latestTimestamp, messageID) {
-        if (!bot.channels.get(channelID)) return;
+        if (!bf.channelObject(channelID)) return;
         cf.log("Something unpinned", "info");
         getPinChannel(channelID, function(target) {
             if (target) {
-                bot.getMessages({channelID: target}, function(e,a) {
+                bot.getMessages(target).then(a => {
                     a.filter(m => m.author.id == bot.user.id)
                     .filter(m => m.embeds[0] && m.embeds[0].type == "rich")
                     .forEach(m => {
                         if (m.embeds[0].footer.text.match(/^.+ \| [0-9]{18,} \| pinned by .+$/)) {
-                            let pinner = Object.keys(bot.users).find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == bot.users.get(u).username);
+                            let pinner = bot.users.find(u => m.embeds[0].footer.text.match(/pinned by (.+)$/)[1] == u.username);
                             //cf.log(pinner, "warning");
                             if (m.embeds[0].footer.text.includes(messageID)) {
                                 if (selfUnpin.includes(messageID)) {
                                     cf.log("Message unpinned by self due to pin limit, not removing from archive", "spam");
                                     selfUnpin = selfUnpin.filter(p => p != messageID);
                                 } else {
+                                    m.delete();
                                     cf.log("Unarchived "+m.id+": "+m.embeds[0].description, "info");
-                                    bot.deleteMessage({channelID: target, messageID: m.id});
                                 }
                             } else {
                                 //cf.log("messageID did not match: "+messageID+" != "+m.embeds[0].footer.text, "spam");
