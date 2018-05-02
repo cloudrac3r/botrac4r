@@ -38,6 +38,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/timezone/timezone.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/only-cloud-cares.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
@@ -46,9 +49,6 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot commands"
     },{
         filename: __dirname+"/beans/beans.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/only-cloud-cares.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/lock.js",
