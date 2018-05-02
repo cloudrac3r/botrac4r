@@ -1,6 +1,6 @@
 #!/usr/local/bin/node
 
-process.on("unhandledRejection", err => { throw err });
+//process.on("unhandledRejection", err => { throw err });
 
 /// === REQUIRES, CONSTANTS AND GLOBALS ===
 
@@ -20,7 +20,10 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/names.js",
         dest: "bot framework"
-    }/*,{
+    },{
+        filename: __dirname+"/garfield.js",
+        dest: "bot commands"
+    },{
         filename: __dirname+"/remind.js",
         dest: "bot commands"
     }/*,{
@@ -31,9 +34,6 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot commands"
     },{
         filename: __dirname+"/timezone/timezone.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/garfield.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/pets/pet.js",

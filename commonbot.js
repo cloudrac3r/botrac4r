@@ -3,6 +3,7 @@ const userEmojiMessage = {channelID: "434994415342321674", messageID: "434994502
 
 let reactionMenus = {};
 let messageMenus = [];
+let warningIgnore = [];
 
 module.exports = function(input) {
     let {bot, cf, db, reloadEvent} = input;
@@ -21,15 +22,18 @@ module.exports = function(input) {
         if (!additional) additional = {};
         return {callback, additional};
     }
-    function createSendableObject(content, additional) {
-        if (!additional) additional = {};
-        if (typeof(content) == "string") {
-            return Object.assign({content}, additional);
-        } else if (typeof(content) == "object") {
-            return Object.assign({}, content, additional);
-        } else if (!content) {
-            return additional;
+    function createSendableObject(input1, input2) {
+        if (!input2) input2 = {};
+        if (typeof(input1) == "string") {
+            input1 = {content: input1};
         }
+        Object.assign(input1, input2);
+        const contentKeys = ["content", "embed", "tts", "disableEveryone"];
+        let content = {};
+        Object.keys(input1).filter(k => contentKeys.includes(k)).forEach(k => content[k] = input1[k]);
+        let file;
+        if (input1.file && input1.filename) file = {file: input1.file, name: input1.filename};
+        return [content, file];
     }
 
     let bf = {
@@ -200,6 +204,14 @@ module.exports = function(input) {
                 target.removeListener(name, code);
             });
         },
+        // Execute code either immediately or when the bot connects.
+        onBotConnect: function(code) {
+            if (bot.startTime) {
+                code();
+            } else {
+                bot.once("ready", code);
+            }
+        },
         // Get a message from a channel.
         getMessage: function(channel, messageID, callback) {
             if (!callback) callback = new Function();
@@ -225,12 +237,13 @@ module.exports = function(input) {
         sendMessage: function(channel, content, c, a) {
             if (!content) content = "";
             let {callback, additional} = fixCAArgs({c, a});
+            let [actualContent, file] = createSendableObject(content, additional)
             return new Promise(resolve => {
                 if (additional.mention) {
                     let mention = bf.userObject(additional.mention);
                     db.get("SELECT mention FROM Users WHERE userID = ?", mention.id, function(err, dbr) {
                         if (dbr && dbr.mention == 1) {
-                            content = mention.mention+" "+content;
+                            actualContent.content = mention.mention+" "+actualContent.content;
                         }
                         delete additional.mention;
                         resolve();
@@ -239,7 +252,7 @@ module.exports = function(input) {
             })
             .then(() => bf.resolveChannel(channel))
             .then(channel => {
-                return channel.createMessage(createSendableObject(content, additional))
+                return channel.createMessage(actualContent, file)
                 .then(messageObject => {
                     cf.log(`Sent a message (${messageObject.id}) to ${bf.nameOfChannel(channel)} (${channel.id}):\n${messageObject.content}`, "spam");
                     bot.getChannel(channel.id).messages.add(messageObject, undefined, true);
@@ -259,15 +272,15 @@ module.exports = function(input) {
         // Edit a message sent by the bot.
         editMessage: function() {
             return bf.withOptionalChannel(arguments)
-            .then(([channel, message, z, c, a]) => {
+            .then(([channel, message, content, c, a]) => {
                 let {callback, additional} = fixCAArgs({c, a});
-                content = createSendableObject(content, additional);
+                let actualContent = createSendableObject(content, additional)[0];
                 let promise;
                 if (channel) {
                     if (typeof(message) == "object") message = message.id;
-                    promise = bot.editMessage(channel.id, message, content);
+                    promise = bot.editMessage(channel.id, actualContent);
                 } else {
-                    promise = message.edit(content);
+                    promise = message.edit(actualContent);
                 }
                 promise.then(messageObject => callback(null, messageObject));
                 promise.catch(err => {
@@ -419,7 +432,6 @@ module.exports = function(input) {
                         promise = bf.addReactions(message, actions.map(a => a.emoji));
                     }
                     reactionMenus[messageID] = {actions, channelID};
-                    cf.log(reactionMenus, "warning");
                     promise.then(() => {
                         callback(null);
                     });
@@ -451,6 +463,58 @@ module.exports = function(input) {
                     messageMenus.push({channelID, userID, pattern, action});
                     callback(null);
                 });
+            });
+        },
+        // Pin a message to a channel
+        pinMessage: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, callback]) => {
+                if (!callback) callback = new Function();
+                let promise;
+                if (channel) {
+                    promise = bot.pinMessage(channel.id, message);
+                } else {
+                    promise = message.pin();
+                }
+                let channelID = channel ? channel.id : message.channel.id;
+                let messageID = typeof(message) == "object" ? message.id : message;
+                promise.catch(err => {
+                    callback(err);
+                    if (warningIgnore.includes(messageID)) return;
+                    warningIgnore.push(messageID);
+                    switch (err.code) {
+                    case 50013:
+                        cf.log(`Missing permissions to pin message ${message} in ${bf.nameOfChannel(channel)} (${channel.id})`, "error");
+                        bf.sendMessage(channel, `I tried to pin a message, but I lack permissions. Please give me a role with "Manage Permissions".`).then(msg => {
+                            setTimeout(() => msg.delete(), 5000);
+                        });
+                        break;
+                    default:
+                        throw err;
+                    }
+                });
+                return promise.then(() => bot.getMessages(channelID).then(messages => {
+                    let pinAlert = messages.sort((a,b) => b.id-a.id).find(m => m.type == 6 && m.author.id == bot.user.id);
+                    return Promise.resolve(pinAlert);
+                    callback(null, pinAlert);
+                }));
+            });
+        },
+        // Unpin a message to a channel
+        unpinMessage: function() {
+            return bf.withOptionalChannel(arguments)
+            .then(([channel, message, callback]) => {
+                if (!callback) callback = new Function();
+                let promise;
+                if (channel) {
+                    promise = bot.unpinMessage(channel.id, message);
+                } else {
+                    promise = message.unpin();
+                }
+                promise.then(() => {
+                    callback(null);
+                });
+                return promise;
             });
         }
     }
