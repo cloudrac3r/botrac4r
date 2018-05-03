@@ -6,7 +6,7 @@ let messageMenus = [];
 let warningIgnore = [];
 
 module.exports = function(input) {
-    let {bot, cf, db, reloadEvent} = input;
+    let {Discord, bot, cf, db, reloadEvent} = input;
     let userEmojis = {};
     let reactionMenus = {};
     let messageMenus = [];
@@ -519,6 +519,28 @@ module.exports = function(input) {
                 });
                 return promise;
             });
+        },
+        // Apply additional permissions to a channel
+        editChannelPermissions: function(channel, thing, overwrites, callback) {
+            let type = bf.userObject(thing) ? "member" : "role";
+            channel = bf.channelObject(channel);
+            overwrites = {...overwrites};
+            if (!callback) callback = new Function();
+            let current = {...bf.channelObject(channel).permissionOverwrites.toObject()[thing]};
+            ["allow", "deny", "default"].forEach(k => {
+                if (!overwrites[k]) overwrites[k] = 0;
+            });
+            ["allow", "deny"].forEach(k => current[k] |= overwrites[k]);
+            ["allow", "deny"].forEach(k => overwrites[k] = (overwrites[k] | overwrites.default) ^ Discord.Constants.Permissions.all);
+            ["allow", "deny"].forEach(k => {
+                let other = (k == "allow" ? "deny" : "allow");
+                current[k] &= overwrites[other];
+            });
+            let promise = bot.editChannelPermission(channel.id, thing, current.allow, current.deny, type);
+            promise.then(() => {
+                callback(null);
+            });
+            return promise;
         }
     }
     // Make reaction menus work

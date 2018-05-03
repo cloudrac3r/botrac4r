@@ -41,6 +41,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/only-cloud-cares.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/lock.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
@@ -49,9 +52,6 @@ let modules = [ // Load these modules on startup and on change
         dest: "bot commands"
     },{
         filename: __dirname+"/beans/beans.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/lock.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/rpg/main.js",
@@ -110,7 +110,7 @@ function loadModules(module) {
                 Object.assign(cf, require(m.filename)); // Load it into common functions
                 break;
             case "bot framework":
-                Object.assign(bf, require(m.filename)({bot: bot, cf: cf, db: db, reloadEvent: reloadEvent})); // Load it into bot framework
+                Object.assign(bf, require(m.filename)({Discord, bot: bot, cf: cf, db: db, reloadEvent: reloadEvent})); // Load it into bot framework
                 break;
             case "bot commands":
                 Object.assign(bc, require(m.filename)({Discord, bot, cf, bf, db, reloadEvent, loadModules})); // Load it as bot commands

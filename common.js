@@ -1,3 +1,10 @@
+Map.prototype.toObject = function() {
+    let array = [...this];
+    let object = {};
+    array.forEach(i => object[i[0]] = i[1]);
+    return object;
+}
+
 module.exports = {
     // Log a message to console with a prefix
     log: function(text, severity) {
