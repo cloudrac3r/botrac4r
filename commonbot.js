@@ -546,14 +546,14 @@ module.exports = function(input) {
     // Make reaction menus work
     bf.addTemporaryListener(bot, "messageReactionAdd", __filename, (msg, emoji, user) => {
         user = bf.userObject(user);
-        emoji = bf.fixEmoji(emoji);
+        let fixedEmoji = bf.fixEmoji(emoji);
         if (user.id == bot.user.id) return;
         let menu = reactionMenus[msg.id];
         if (!menu) return;
-        let action = menu.actions.find(a => a.emoji == emoji);
+        let action = menu.actions.find(a => a.emoji == fixedEmoji);
         if (!action) return;
         if (action.allowedUsers && !action.allowedUsers.includes(user.id)) {
-            if (action.remove == "user") bf.removeReaction(msg, emoji, user);
+            if (action.remove == "user") bf.removeReaction(msg, fixedEmoji, user);
             return;
         }
         switch (action.actionType) {
@@ -572,10 +572,10 @@ module.exports = function(input) {
         }
         switch (action.ignore) {
         case "that":
-            menu.actions.find(a => a.emoji == emoji).actionType = "none";
+            menu.actions.find(a => a.emoji == fixedEmoji).actionType = "none";
             break;
         case "thatTotal":
-            menu.actions = menu.actions.filter(a => a.emoji != emoji);
+            menu.actions = menu.actions.filter(a => a.emoji != fixedEmoji);
             break;
         case "all":
             menu.actions.forEach(a => a.actionType = "none");
@@ -586,13 +586,13 @@ module.exports = function(input) {
         }
         switch (action.remove) {
         case "user":
-            bf.removeReaction(msg, emoji, user);
+            bf.removeReaction(msg, fixedEmoji, user);
             break;
         case "bot":
-            bf.removeReaction(msg, emoji, bot.user);
+            bf.removeReaction(msg, fixedEmoji, bot.user);
             break;
         case "that":
-            bf.removeReactions(msg, [emoji]);
+            bf.removeReactions(msg, [fixedEmoji]);
             break;
         case "all":
             msg.removeReactions();

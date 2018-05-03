@@ -1,5 +1,6 @@
 module.exports = function(input) {
-    //TODO Add minion, only starter can start, wolf card "type", custom role sets, randomly pick from too large role sets
+    //TODO Add minion, custom role sets, randomly pick from too large role sets
+    //TODO Test Troublemaker, Insomniac, Drunk (Eris)
     let {bot, cf, bf, db} = input;
     let lastCheckMessage = {};
     let games = [];
@@ -44,12 +45,14 @@ module.exports = function(input) {
         constructor() {
             super("tanner");
         }
-        isWinner(game, teamStatus) {
+        isWinner(game, teamStatus, player) {
+            /*
             if (teamStatus["tanner"].every(s => s == "dead")) {
                 return true;
             } else {
                 return false;
-            }
+            }*/
+            return !player.alive;
         }
     }
     class Card {
@@ -76,23 +79,24 @@ module.exports = function(input) {
         constructor() {
             super("werewolf", new WerewolfTeam());
             this.order = 1;
+            this.type = "werewolf";
         }
         interact(game, player, finished) {
             let message = "";
             let actions = [];
-            let wolfList = game.players.filter(p => p.userID != player.userID)
-                                       .filter(p => ["werewolf", "dream wolf", "mystic wolf"].includes(p.card.role))
-                                       .map(p => ({userID: p.userID, type: p.card.role}));
+            let wolfList = game.players.filter(p => p.user.id != player.user.id)
+                                       .filter(p => p.card.type == "werewolf")
+                                       .map(p => ({user: p.user, type: p.card.role}));
             if (wolfList.length == 0) {
                 message = "There are no other werewolves in this game.\n"+
                           "As the lone wolf, you may look at a centre card by pressing a reaction.";
-                function actionManager(event) {
-                    let button = parseInt(event.d.emoji.name.replace(/^bn_([0-9])$/, "$1"));
+                function actionManager(msg, emoji, user) {
+                    let button = parseInt(emoji.name.replace(/^bn_([0-9])$/, "$1"));
                     if (game.centreCards[button-1]) {
-                        bf.sendMessage(event.d.channel_id, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
-                        game.addToLog(player.userID, player.card.role, "Looked at centre card #"+button);
+                        bf.sendMessage(msg.channel, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
+                        game.addToLog(player.user, player.card.role, "Looked at centre card #"+button);
                     } else {
-                        bf.sendMessage(event.d.channel_id, "You decided not to look at a centre card for no reason.");
+                        bf.sendMessage(msg.channel, "You decided not to look at a centre card for no reason.");
                     }
                     finished();
                 }
@@ -103,12 +107,12 @@ module.exports = function(input) {
                     {emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: actionManager},
                 ];
             } else if (wolfList.length == 1) {
-                message = "The other werewolf in this game is "+bf.userIDToNick(wolfList[0].userID, game.serverID, "username")+" ("+wolfList[0].type+").";
+                message = "The other werewolf in this game is "+bf.userToNick(wolfList[0].user, game.guild, "username")+" ("+wolfList[0].type+").";
                 actions = [
                     {emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}
                 ];
             } else {
-                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users.get(i.userID).username+" ("+i.type+")"))+".";
+                message = "The other werewolves in this game are "+cf.listify(wolfList.map(i => i.user.username+" ("+i.type+")"))+".";
                 actions = [
                     {emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}
                 ];
@@ -125,41 +129,41 @@ module.exports = function(input) {
             let message = "As seer, you may examine either a single card of another player, or two cards from the centre.\n"+
                           "Click either the player or the cards reaction.";
             let actions = [
-                {emoji: bf.buttons["person"], ignore: "total", actionType: "js", actionData: function(event) {
-                    let info = game.getPlayerMenu([player.userID]);
-                    function actionManager(event) {
-                        let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                        bf.sendMessage(event.d.channel_id, `${bot.users.get(chosen.userID).username}'s card is ${chosen.card.role}.`);
-                        game.addToLog(player.userID, player.card.role, `Looked at ${bot.users.get(chosen.userID).username}'s card: ${chosen.card.role}`);
+                {emoji: bf.buttons["person"], ignore: "total", actionType: "js", actionData: function(msg, emoji, user) {
+                    let info = game.getPlayerMenu([player.user.id]);
+                    function actionManager(msg, emoji, user) {
+                        let chosen = info.sorted[parseInt(emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                        bf.sendMessage(msg.channel, `${chosen.user.username}'s card is ${chosen.card.role}.`);
+                        game.addToLog(player.user, player.card.role, `Looked at ${chosen.user.username}'s card: ${chosen.card.role}`);
                         finished();
                     }
-                    bf.reactionMenu(event.d.channel_id, "Choose a player.\n"+info.list.join("\n"),
+                    bf.reactionMenu(msg.channel, "Choose a player.\n"+info.list.join("\n"),
                         info.sorted.map((p,i) => ({emoji: bf.buttons[i+1+""], ignore: "total", actionType: "js", actionData: actionManager})));
                 }},
-                {emoji: bf.buttons["cards"], ignore: "total", actionType: "js", actionData: function(event) {
+                {emoji: bf.buttons["cards"], ignore: "total", actionType: "js", actionData: function(msg, emoji, user) {
                     let seenCards = [];
-                    function actionManager(event) {
+                    function actionManager(msg, emoji, user) {
                         if (seenCards.length >= 2) {
-                            bf.sendMessage(event.d.channel_id, "You may not look at any more cards.");
+                            bf.sendMessage(msg.channel, "You may not look at any more cards.");
                         } else {
-                            let button = parseInt(event.d.emoji.name.replace(/^bn_([0-9])$/, "$1"));
-                            bf.sendMessage(event.d.channel_id, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
+                            let button = parseInt(emoji.name.replace(/^bn_([0-9])$/, "$1"));
+                            bf.sendMessage(msg.channel, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
                             seenCards.push(button);
                             if (seenCards.length == 2) {
                                 seenCards = seenCards.sort();
-                                game.addToLog(player.userID, player.card.role, `Looked at centre cards ${cf.listify(seenCards.map(n => "#"+n))}`);
+                                game.addToLog(player.user, player.card.role, `Looked at centre cards ${cf.listify(seenCards.map(n => "#"+n))}`);
                                 finished();
                             }
                         }
                     }
-                    bf.reactionMenu(event.d.channel_id, "Choose two centre cards.", [
+                    bf.reactionMenu(msg.channel, "Choose two centre cards.", [
                         {emoji: bf.buttons["1"], ignore: "that", actionType: "js", actionData: actionManager},
                         {emoji: bf.buttons["2"], ignore: "that", actionType: "js", actionData: actionManager},
                         {emoji: bf.buttons["3"], ignore: "that", actionType: "js", actionData: actionManager}
                     ]);
                 }},
-                {emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
-                    bf.sendMessage(event.d.channel_id, "You decided not to look at any cards for no reason.");
+                {emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(msg) {
+                    bf.sendMessage(msg.channel, "You decided not to look at any cards for no reason.");
                     finished();
                 }}
             ];
@@ -174,17 +178,17 @@ module.exports = function(input) {
         interact(game, player, finished) {
             let message = "As robber, you may steal a card from another player.\n"+
                           "Choose the player that you want to steal from.\n";
-            let info = game.getPlayerMenu([player.userID], (event) => {
-                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                bf.sendMessage(event.d.channel_id, "You stole and became a "+chosen.card.role+".");
+            let info = game.getPlayerMenu([player.user.id], (msg, emoji, user) => {
+                let chosen = info.sorted[parseInt(emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                bf.sendMessage(msg.channel, "You stole and became a "+chosen.card.role+".");
                 finished(this.order, function() {
-                    game.addToLog(player.userID, player.card.role, `Stole ${bot.users.get(chosen.userID).username}'s ${chosen.card.role}`);
+                    game.addToLog(player.user, player.card.role, `Stole ${chosen.user.username}'s ${chosen.card.role}`);
                     let newCard = player.exchangeCard(chosen);
                 });
             });
             message += info.list.join("\n");
-            let actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
-                bf.sendMessage(event.d.channel_id, "You decided not to steal from anybody. What a nice person you must be!!");
+            let actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(msg, emoji, user) {
+                bf.sendMessage(msg.channel, "You decided not to steal from anybody. What a nice person you must be!");
                 finished();
             }}]);
             return {message: message, actions: actions};
@@ -201,34 +205,32 @@ module.exports = function(input) {
             let previouslyClicked;
             let clickCount = 0;
             let previousMessageID;
-            let info = game.getPlayerMenu([player.userID], (event) => {
+            let info = game.getPlayerMenu([player.user.id], (msg, emoji, user) => {
                 // Enough players, get two and execute the swap
-                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                let chosen = info.sorted[parseInt(emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
                 clickCount++;
                 if (!previouslyClicked) {
                     previouslyClicked = chosen;
-                    bf.sendMessage(event.d.channel_id, bot.users.get(previouslyClicked.userID).username+"'s card will be swapped with...", function(e,id) {
-                        previousMessageID = id;
+                    bf.sendMessage(msg.channel, previouslyClicked.user.username+"'s card will be swapped with...").then(msg => {
+                        previousMessageID = msg.id;
                     });
-                } else if (previouslyClicked.userID == chosen.userID) {
+                } else if (previouslyClicked.user.id == chosen.user.id) {
                     clickCount--;
                 } else if (clickCount == 2) {
-                    let message = bot.users.get(previouslyClicked.userID).username+"'s card has been swapped with "+bot.users.get(chosen.userID).username+"'s card.";
+                    let message = previouslyClicked.user.username+"'s card has been swapped with "+chosen.user.username+"'s card.";
                     if (previousMessageID) {
-                        bf.editMessage(event.d.channel_id, previousMessageID, message, function(e) {
-                            if (e) {
-                                bf.sendMessage(event.d.channel_id, message);
-                            }
+                        bf.editMessage(msg.channel, previousMessageID, message).then(() => {
+                            bf.sendMessage(msg.channel, message);
                         });
                     } else {
-                        bf.sendMessage(event.d.channel_id, message);
+                        bf.sendMessage(msg.channel, message);
                     }
                     finished(this.order, function() {
-                        game.addToLog(player.userID, player.card.role, `Swapped ${bot.users.get(previouslyClicked.userID).username}'s ${previouslyClicked.card.role} with ${bot.users.get(chosen.userID).username}'s ${chosen.card.role}`);
+                        game.addToLog(player.user, player.card.role, `Swapped ${previouslyClicked.user.username}'s ${previouslyClicked.card.role} with ${chosen.user.username}'s ${chosen.card.role}`);
                         chosen.exchangeCard(previouslyClicked);
                     });
                 } else {
-                    bf.sendMessage(event.d.channel_id, "You have already completed your action.");
+                    bf.sendMessage(msg.channel, "You have already completed your action.");
                 }
             }, "this");
             if (info.sorted.length < 2) {
@@ -236,8 +238,8 @@ module.exports = function(input) {
                 actions = [{emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}];
             } else {
                 message += "Choose the two players that you would like to swap.\n"+info.list.join("\n");
-                actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
-                    bf.sendMessage(event.d.channel_id, "You decided not swap any cards. Your loss.");
+                actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(msg, emoji, user) {
+                    bf.sendMessage(msg.channel, "You decided not swap any cards. Your loss.");
                     finished();
                 }}]);
             }
@@ -252,15 +254,15 @@ module.exports = function(input) {
         interact(game, player, finished) {
             let message = "As mason, you may see the other masons in this game.\n";
             let actions = [];
-            let masonList = game.players.filter(p => p.userID != player.userID)
+            let masonList = game.players.filter(p => p.user.id != player.user.id)
                                        .filter(p => p.card.role == "mason")
-                                       .map(p => p.userID);
+                                       .map(p => p.user);
             if (masonList.length == 0) {
-                message += "Nevermind, there aren't any others.";
+                message += "However, there aren't actually any other masons this time.";
             } else if (masonList.length == 1) {
-                message += "The other mason in this game is "+bf.userIDToNick(masonList[0], game.serverID, "username")+".";
+                message += "The other mason in this game is "+bf.userToNick(masonList[0], game.guild, "username")+".";
             } else {
-                message += "The other masons in this game are "+cf.listify(masonList.map(i => bot.users.get(i).username))+".";
+                message += "The other masons in this game are "+cf.listify(masonList.map(i => i.username))+".";
             }
             actions = [{emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: finished}];
             return {message: message, actions: actions};
@@ -270,6 +272,7 @@ module.exports = function(input) {
         constructor() {
             super("dream wolf", new WerewolfTeam());
             this.order = 1;
+            this.type = "werewolf";
         }
         interact(game, player, finished) {
             let message = "You are a werewolf, but you cannot see the other werewolves and you may not look at any centre cards.";
@@ -287,7 +290,7 @@ module.exports = function(input) {
             let actions = [
                 {emoji: bf.buttons["tick"], ignore: "total", actionType: "js", actionData: () => {
                     finished(this.order, function() {
-                        bf.sendMessage(player.userID, "You are now "+cf.indefArtify(player.card.role)+".");
+                        bf.sendMessage(player.user, "You are now "+cf.indefArtify(player.card.role)+".");
                     });
                 }}
             ];
@@ -301,11 +304,11 @@ module.exports = function(input) {
         }
         interact(game, player, finished) {
             let message = "As drunk, you must blindly select a card from the centre to serve as your new card.";
-            let actionManager = (event) => {
-                let button = parseInt(event.d.emoji.name.replace(/^bn_([0-9])$/, "$1"));
-                bf.sendMessage(event.d.channel_id, `Your card has been swapped with centre card #${button}.`);
+            let actionManager = (msg, emoji, user) => {
+                let button = parseInt(emoji.name.replace(/^bn_([0-9])$/, "$1"));
+                bf.sendMessage(msg.channel, `Your card has been swapped with centre card #${button}.`);
                 finished(this.order, function() {
-                    game.addToLog(player.userID, player.card.role, "Became centre card #"+button);
+                    game.addToLog(player.user, player.card.role, "Became centre card #"+button);
                     //let newCard = player.exchangeCard({card: game.centreCards[button-1]});
                     let newCard = game.centreCards[button-1];
                     game.centreCards[button-1] = player.card;
@@ -324,33 +327,34 @@ module.exports = function(input) {
         constructor() {
             super("mystic wolf", new WerewolfTeam());
             this.order = 1;
+            this.type = "werewolf";
         }
         interact(game, player, finished) {
             let message = "";
             let actions = [];
-            let wolfList = game.players.filter(p => p.userID != player.userID)
-                                       .filter(p => ["werewolf", "dream wolf", "mystic wolf"].includes(p.card.role))
-                                       .map(p => ({userID: p.userID, type: p.card.role}));
+            let wolfList = game.players.filter(p => p.user.id != player.user.id)
+                                       .filter(p => p.card.type == "werewolf")
+                                       .map(p => ({user: p.user, type: p.card.role}));
             if (wolfList.length == 0) {
-                message = "As mystic wolf, you may examine the card of any non-wolf player.\n"+
-                          "There are no other werewolves in this game.";
+                message = "As mystic wolf, you would normally be able to examine the card of any non-wolf player.\n"+
+                          "This time, though, there aren't any other werewolves in the game.";
             } else if (wolfList.length == 1) {
                 message = "As mystic wolf, you may examine the card of any non-wolf player.\n"+
-                          "The other werewolf in this game is "+bf.userIDToNick(wolfList[0].userID, game.serverID, "username")+" ("+wolfList[0].type+").";
+                          "The other werewolf in this game is "+bf.userToNick(wolfList[0].user, game.guild, "username")+" ("+wolfList[0].type+").";
             }else {
                 message = "As mystic wolf, you may examine the card of any non-wolf player.\n"+
-                          "The other werewolves in this game are "+cf.listify(wolfList.map(i => bot.users.get(i.userID).username+" ("+i.type+")"))+".";
+                          "The other werewolves in this game are "+cf.listify(wolfList.map(i => i.username+" ("+i.type+")"))+".";
             }
-            let wolfPlays = game.players.filter(p => ["werewolf", "dream wolf", "mystic wolf"].includes(p.card.role));
-            let info = game.getPlayerMenu([wolfPlays], function(event) {
-                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
-                    bf.sendMessage(event.d.channel_id, `${bot.users.get(chosen.userID).username}'s card is ${chosen.card.role}.`);
-                    game.addToLog(player.userID, player.card.role, `Looked at ${bot.users.get(chosen.userID).username}'s card: ${chosen.card.role}`);
+            let wolfPlays = game.players.filter(p => p.card.type == "werewolf");
+            let info = game.getPlayerMenu([wolfPlays], function(msg, emoji, user) {
+                let chosen = info.sorted[parseInt(emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+                    bf.sendMessage(msg.channel, `${chosen.user.username}'s card is ${chosen.card.role}.`);
+                    game.addToLog(player.user, player.card.role, `Looked at ${chosen.user.username}'s card: ${chosen.card.role}`);
                     finished();
             });
-            message += "\nChoose a player to examine the card of.\n"+info.list.join("\n");
-            actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(event) {
-                bf.sendMessage(event.d.channel_id, "And yet, for all your pretentions at mysticism, you remain blinded by your own wilful ignorance.");
+            message += "\n\nChoose a player to examine the card of.\n"+info.list.join("\n");
+            actions = info.actions.concat([{emoji: bf.buttons["times"], ignore: "total", actionType: "js", actionData: function(msg, emoji, user) {
+                bf.sendMessage(msg.channel, "And yet, for all your pretentions at mysticism, you remain blinded by your own wilful ignorance.");
                 finished();
             }}]);
             return {message: message, actions: actions};
@@ -363,14 +367,14 @@ module.exports = function(input) {
         }
         interact(game, player, finished) {
             let message = "As apprentice seer, you may examine a single centre card.";
-            function actionManager(event) {
-                let button = parseInt(event.d.emoji.name.replace(/^bn_([0-9])$/, "$1"));
+            function actionManager(msg, emoji, user) {
+                let button = parseInt(emoji.name.replace(/^bn_([0-9])$/, "$1"));
                 if (game.centreCards[button-1]) {
-                    bf.sendMessage(event.d.channel_id, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
-                    game.addToLog(player.userID, player.card.role, "Looked at centre card #"+button);
+                    bf.sendMessage(msg.channel, `Centre card #${button} is ${game.centreCards[button-1].role}.`);
+                    game.addToLog(player.user, player.card.role, "Looked at centre card #"+button);
                 } else {
-                    bf.sendMessage(event.d.channel_id, "It is said that those with limited sight gain a profound appreciation for what sight they do indeed have.\n"+
-                                                       "Your stunning ineptitude is manifest evidence to the contrary. You'll never become a real seer at this rate!");
+                    bf.sendMessage(msg.channel, "It is said that those with limited sight gain a profound appreciation for what sight they do indeed have.\n"+
+                                                "Your stunning ineptitude is manifest evidence to the contrary. You'll never become a real seer at this rate!");
                 }
                 finished();
             }
@@ -397,7 +401,7 @@ module.exports = function(input) {
         }
     }
     const cardSets = {
-        2: [new Drunk(), new Drunk(), new Drunk(), new Villager(), new Villager()],
+        2: [new Werewolf(), new Werewolf(), new Werewolf(), new Werewolf(), new Werewolf()],
         3: [new Robber(), new Troublemaker(), new Insomniac(), new Seer(), new Drunk(), new DreamWolf()],
         4: [new Robber(), new Troublemaker(), new Insomniac(), new Tanner(), new Drunk(), new Tanner(), new Seer],
         5: [new Werewolf(), new MysticWolf(), new Insomniac(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
@@ -405,16 +409,16 @@ module.exports = function(input) {
     };
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
-        if (bot.startTime) {
+        bf.onBotConnect(() => {
             bf.sendMessage("244613376360054794", "ONUW role set "+n+" does not have the correct array length.");
-        }
+        });
     });
     class Game {
-        constructor(channelID) { // Set up new game
+        constructor(channel) { // Set up new game
             this.players = [];
             this.centreCards;
-            this.serverID = bot.channelGuildMap[channelID];
-            this.channelID = channelID;
+            this.guild = channel.guild;
+            this.channel = channel;
             this.phase = "not started"; // "night", "day", "voting"
             this.timer = {time: 300000, strict: false};
             this.progressCount = 0;
@@ -424,12 +428,12 @@ module.exports = function(input) {
             this.startedAt;
         }
         // Return a list of the players in the game
-        getPlayerMenu(exclude, actionData, ignore) {
+        getPlayerMenu(excludeIDs, actionData, ignore) {
             if (!ignore) ignore = "total";
             let info = {};
-            info.sorted = this.players.filter(p => !exclude.includes(p.userID))
-                                      .sort((a,b) => (bf.userIDToNick(a.userID, this.serverID, "username") > bf.userIDToNick(b.userID, this.serverID, "username") ? 1 : -1));
-            info.list = info.sorted.map((p,i) => `${bf.buttons[i+1+""]} ${bf.userIDToNick(p.userID, this.serverID, "username")}`);
+            info.sorted = this.players.filter(p => !excludeIDs.includes(p.user.id))
+                                      .sort((a,b) => (bf.userToNick(a.user, this.guild, "username") > bf.userToNick(b.user, this.guild, "username") ? 1 : -1));
+            info.list = info.sorted.map((p,i) => `${bf.buttons[i+1+""]} ${bf.userToNick(p.user, this.guild, "username")}`);
             info.actions = info.sorted.map((p,i) => ({emoji: bf.buttons[i+1+""], ignore: ignore, actionType: "js", actionData: actionData}));
             //info.buttons = Object.keys({...[...new Array(5)]}).map(i => bf.buttons[parseInt(i)+1+""]);
             //info.IDs = info.sorted.map(p => p.userID);
@@ -437,7 +441,7 @@ module.exports = function(input) {
         }
         // Given a userID, return the player object.
         getPlayerByID(userID) {
-            let players = this.players.filter(p => p.userID==userID);
+            let players = this.players.filter(p => p.user.id == userID);
             if (players.length == 0) {
                 return null;
             } else {
@@ -445,12 +449,12 @@ module.exports = function(input) {
             }
         }
         // Add or remove from a player to or from the game
-        addOrRemove(userID) {
-            if (this.getPlayerByID(userID)) { // Player already added
-                this.players = this.players.filter(p => p.userID!=userID);
+        addOrRemove(user) {
+            if (this.getPlayerByID(user.id)) { // Player already added
+                this.players = this.players.filter(p => p.user.id != user.id);
                 return "removed";
             } else { // Player not yet added
-                this.players.push(new Player(userID));
+                this.players.push(new Player(user));
                 return "added";
             }
         }
@@ -482,12 +486,13 @@ module.exports = function(input) {
         }
     }
     class Player {
-        constructor(userID) {
-            this.userID = userID;
+        constructor(user) {
+            this.user = user;
             this.card = undefined;
             this.originalCard = undefined;
             this.votesFor = 0;
             this.interacted = false;
+            this.alive = true;
         }
         // Swap cards with another player.
         exchangeCard(player) {
@@ -504,20 +509,24 @@ module.exports = function(input) {
             return cards;
         }
         // Send the interaction menu DM to the player.
-        sendInteractMenu(game, channelID, finished) {
+        sendInteractMenu(game, channel, finished) {
             let menu = this.card.interact(game, this, finished);
-            bf.reactionMenu(this.userID, "Your card is "+this.card.role+".\n"+menu.message, menu.actions);
+            bf.reactionMenu(this.user, "Your card is "+this.card.role+".\n"+menu.message, menu.actions);
         }
         // Vote for whomst to kill.
         startVoting(game, finished) {
-            let info = game.getPlayerMenu([], function(event) {
-                let chosen = info.sorted[parseInt(event.d.emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
+            let info = game.getPlayerMenu([], function(msg, emoji, user) {
+                let chosen = info.sorted[parseInt(emoji.name.replace(/^bn_([0-9]+)$/, "$1"))-1];
                 chosen.votesFor++;
-                bf.sendMessage(event.d.channel_id, "You voted for "+bot.users.get(chosen.userID).username+".");
+                bf.sendMessage(msg.channel, "You voted for "+chosen.user.username+".");
                 finished();
             });
-            bf.reactionMenu(this.userID, "Choose a user to vote for.\n"+info.list.join("\n"), info.actions);
+            bf.reactionMenu(this.user, "Choose a user to vote for.\n"+info.list.join("\n"), info.actions);
         }
+    }
+    function updateLastCheckMessage(channel, message) {
+        if (lastCheckMessage[channel.id]) lastCheckMessage[channel.id].delete();
+        lastCheckMessage[channel.id] = message;
     }
     let availableFunctions = {
         onuw: {
@@ -525,24 +534,25 @@ module.exports = function(input) {
             shortHelp: "Play One Night Ultimate Werewolf",
             reference: "",
             longHelp: "",
-            code: function(userID, channelID, command, d) {
-                if (bot.isDMChannel(channelID)) {
-                    bf.sendMessage(channelID, "You cannot use these commands in a direct message.");
+            eris: true,
+            code: function(msg, command) {
+                if (bf.isDMChannel(msg.channel)) {
+                    bf.sendMessage(msg.channel, "You cannot use these commands in a direct message.");
                     return;
                 }
                 if (["new", "start", "join"].some(w => command.input.toLowerCase().includes(w))) {
                     startNewGame();
                 } else if (["check", "info", "detail"].some(w => command.input.toLowerCase().includes(w))) {
-                    check(channelID);
+                    check(msg.channel);
                 } else if (["timer", "time"].some(w => command.input.toLowerCase().includes(w))) {
-                    let game = games.filter(g => g.channelID == channelID)[0];
+                    let game = games.find(g => g.channel.id == msg.channel.id);
                     if (game) {
                         let time = command.switches.time || command.switches.timer || command.switches.minutes || 0;
                         let strict;
                         if (command.flags.on.includes("strict")) strict = "on";
                         if (command.flags.off.includes("strict")) strict = "off";
                         if (!parseInt(time)) {
-                            bf.sendMessage(channelID, `The correct syntax is **${command.prefix}${command.name} timer time=*minutes* ±strict**.`);
+                            bf.sendMessage(msg.channel, `The correct syntax is **${command.prefix}${command.name} timer time=*minutes* ±strict**.`);
                             return;
                         }
                         game.timer.time = parseInt(time)*60000;
@@ -554,105 +564,84 @@ module.exports = function(input) {
                         } else {
                             output += ".";
                         }
-                        bf.sendMessage(channelID, output,
-                            function(e,id) {
-                                if (id) lastCheckMessage[channelID] = id;
-                            },
-                            {mention: userID});
+                        bf.sendMessage(msg.channel, output).then(msg => updateLastCheckMessage(msg.channel, msg));
                     } else {
-                        bf.sendMessage(channelID, "There is no ongoing game in this channel.",
-                            function(e,id) {
-                                if (id) lastCheckMessage[channelID] = id;
-                            },
-                            {mention: userID});
+                        bf.sendMessage(msg.channel, "There is no ongoing game in this channel.").then(msg => updateLastCheckMessage(msg.channel, msg));
                     }
-                    bot.deleteMessage({channelID: channelID, messageID: lastCheckMessage[channelID]});
                 } else if (["end", "stop", "quit", "vote"].some(w => command.input.toLowerCase().includes(w))) {
                     endGame();
                 } else if (["reset", "erase", "delete"].some(w => command.input.toLowerCase().includes(w))) {
-                    if (games.some(g => g.channelID == channelID)) {
-                        games = games.filter(g => g.channelID != channelID);
-                        bf.sendMessage(channelID, "The game in this channel was reset.", {mention: userID});
+                    if (games.some(g => g.channel.id == msg.channel.id)) {
+                        games = games.filter(g => g.channel.id != msg.channel.id);
+                        bf.sendMessage(msg.channel, "The game in this channel was reset.");
                     } else {
                         games = [];
-                        bf.sendMessage(channelID, "All games were reset.", {mention: userID});
+                        bf.sendMessage(msg.channel, "All games were reset.");
                     }
                 } else {
-                    if (games.some(g => g.channelID == channelID)) {
-                        check(channelID);
+                    if (games.some(g => g.channel.id == msg.channel.id)) {
+                        check(msg.channel);
                     } else {
                         startNewGame();
                     }
                     //bf.sendMessage(channelID, "Incorrect command usage.", {mention: userID});
                 }
-                function check(channelID) {
-                    let game = games.filter(g => g.channelID == channelID)[0];
+                function check(channel) {
+                    let game = games.find(g => g.channel.id == channel.id);
                     if (game) {
-                        bf.sendMessage(channelID, "**Current ONUW game details**\n"+
-                            "**Players**: "+cf.listify(game.players.map(p => bot.users.get(p.userID).username).sort(), "nobody")+"\n"+
+                        bf.sendMessage(channel, "**Current ONUW game details**\n"+
+                            "**Players**: "+cf.listify(game.players.map(p => p.user.username).sort(), "nobody")+"\n"+
                             "**Cards**: "+cf.listify((cardSets[game.players.length] || []).map(c => c.role), "N/A")+"\n"+
-                            "**Timer**: "+(game.phase == "day" ? (game.timer.time ? (game.timer.time-Date.now()+game.startedAt >= 0 ? (Math.floor((game.timer.time-Date.now()+game.startedAt)/60000)+":"+(Math.floor((game.timer.time-Date.now()+game.startedAt)/1000%60)+"").padStart(2, "0")+" remaining") : "expired!") : "off") : (game.timer.time ? parseInt((game.timer.time/60000).toFixed(2))+" "+cf.plural("minute", game.timer.time/60000)+", "+(game.timer.strict ? "strict" : "not strict") : "off")),
-                            function(e,id) {
-                                if (id) lastCheckMessage[channelID] = id;
-                            },
-                            {mention: userID});
+                            "**Timer**: "+(game.phase == "day" ? (game.timer.time ? (game.timer.time-Date.now()+game.startedAt >= 0 ? (Math.floor((game.timer.time-Date.now()+game.startedAt)/60000)+":"+(Math.floor((game.timer.time-Date.now()+game.startedAt)/1000%60)+"").padStart(2, "0")+" remaining") : "expired!") : "off") : (game.timer.time ? parseInt((game.timer.time/60000).toFixed(2))+" "+cf.plural("minute", game.timer.time/60000)+", "+(game.timer.strict ? "strict" : "not strict") : "off")))
+                        .then(msg => updateLastCheckMessage(msg.channel, msg));
                     } else {
-                        bf.sendMessage(channelID, "There is no ongoing game in this channel.",
-                            function(e,id) {
-                                if (id) lastCheckMessage[channelID] = id;
-                            },
-                            {mention: userID});
+                        bf.sendMessage(channel, "There is no ongoing game in this channel.").then(msg => updateLastCheckMessage(msg.channel, msg));
                     }
-                    bot.deleteMessage({channelID: channelID, messageID: lastCheckMessage[channelID]});
                 }
-                function startNewGame(players) {
-                    if (!players) players = [];
-                    if (games.some(g => g.channelID == channelID)) {
-                        bf.sendMessage(channelID, "<@"+userID+"> There is already an ongoing game in this channel. Why not join in?");
+                function startNewGame(users) {
+                    if (!users) users = [];
+                    if (games.some(g => g.channel.id == msg.channel.id)) {
+                        bf.sendMessage(msg.channel, "There is already an ongoing game in this channel. Why not join in?");
                         return;
                     }
-                    let game = new Game(channelID);
+                    let game = new Game(msg.channel);
                     games.push(game);
-                    players.forEach(p => game.addOrRemove(p));
+                    users.forEach(u => game.addOrRemove(u));
                     let template = "**One Night Ultimate Werewolf**\n";
                     let id;
-                    bf.reactionMenu(channelID, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"), [
-                        {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(event) {
-                            game.addOrRemove(event.d.user_id);
+                    bf.reactionMenu(msg.channel, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.user.id+">"), "nobody"), [
+                        {emoji: bf.buttons["plusminus"], remove: "user", actionType: "js", actionData: function(msg, emoji, user) {
+                            game.addOrRemove(user);
                             game.lastActive = Date.now();
                             //game.addOrRemove("359203132980461568");
-                            bf.editMessage(channelID, event.d.message_id, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.userID+">"), "nobody"));
+                            bf.editMessage(msg, template+"Current players (**"+game.players.length+"**): "+cf.listify(game.players.map(p => "<@"+p.user.id+">"), "nobody"));
                         }},
-                        {emoji: bf.buttons["question"], remove: "user", actionType: "js", actionData: function(event) {
-                            check(event.d.channel_id);
+                        {emoji: bf.buttons["question"], remove: "user", actionType: "js", actionData: function(msg, emoji, user) {
+                            check(msg.channel);
                         }},
-                        {emoji: bf.buttons["clock"], remove: "user", actionType: "js", actionData: function(event) {
+                        {emoji: bf.buttons["clock"], remove: "user", actionType: "js", actionData: function(msg, emoji, user) {
                             if (game.timer == 0) {
                                 game.timer = 300000;
                             } else {
                                 game.timer = 0;
                             }
-                            bf.sendMessage(channelID, `The game timer has been turned ${game.timer ? "on" : "off"}. Use **${command.prefix}${command.name} timer time=*minutes* ±strict** to adjust the length and strict game ending more precisely.`,
-                                function(e,id) {
-                                    if (id) lastCheckMessage[channelID] = id;
-                                },
-                                {mention: event.d.user_id});
-                            bot.deleteMessage({channelID: channelID, messageID: lastCheckMessage[channelID]});
+                            bf.sendMessage(msg.channel, `The game timer has been turned ${game.timer ? "on" : "off"}. Use **${command.prefix}${command.name} timer time=*minutes* ±strict** to adjust the length and strict game ending more precisely.`)
+                            .then(msg => updateLastCheckMessage(msg.channel, msg));
                         }},
-                        {emoji: bf.buttons["tick"], remove: "user", actionType: "js", actionData: function(event) {
+                        {emoji: bf.buttons["tick"], remove: "user", allowedUsers: [msg.author.id], actionType: "js", actionData: function(msg, emoji, user) {
                             if (cardSets[game.players.length]) {
                                 //bot.deleteMessage({channelID: game.channelID, messageID: id});
-                                bot.removeAllReactions({channelID: game.channelID, messageID: id});
+                                msg.removeReactions();
                                 game.phase = "night";
                                 let cards = [...cardSets[game.players.length]];
                                 game.players.forEach(p => {
                                     p.takeRandomCard(cards);
                                 });
                                 game.setUpCentreCards(cards);
-                                let interactID;
+                                let interactMessage;
                                 game.players.forEach(p => {
                                     //bot.mute({userID: p.userID, serverID: game.serverID});
-                                    p.sendInteractMenu(game, event.d.channel_id, function(order, code) {
+                                    p.sendInteractMenu(game, msg.channel, function(order, code) {
                                         p.interacted = true;
                                         if (typeof(order) == "number" && code) game.pendingActions.push({order: order, code: code});
                                         if (++game.progressCount == game.players.length) {
@@ -661,32 +650,29 @@ module.exports = function(input) {
                                             });
                                             game.pendingActions.length = 0;
                                             game.phase = "day";
-                                            bot.deleteMessage({channelID: game.channelID, messageID: interactID});
+                                            interactMessage.delete();
                                             //game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
                                             const timeLimits = [
-                                                {before: 0, message: "**Time's up!** "+game.players.map(p => "<@"+p.userID+">")},
+                                                {before: 0, message: "**Time's up!**\n"+game.players.map(p => p.user.mention).join(" ")},
                                                 {before: 30000, message: "30 seconds remaining!"},
                                                 {before: 60000, message: "1 minute remaining."}
                                             ];
-                                            let lastTimerID;
+                                            let lastTimerMessage;
                                             if (game.timer.time) {
                                                 timeLimits.forEach((l,i) => {
                                                     if (game.timer.time > l.before) {
                                                         setTimeout(function() {
                                                             if (game.phase == "day") {
-                                                                bf.sendMessage(channelID, l.message,
-                                                                    function(e,id) {
-                                                                        lastTimerID = id;
-                                                                    });
-                                                                bot.deleteMessage({channelID: channelID, messageID: lastTimerID});
+                                                                if (lastTimerMessage) lastTimerMessage.delete();
+                                                                bf.sendMessage(msg.channel, l.message).then(msg => lastTimerMessage = msg);
                                                                 if (i == 0 && game.timer.strict) endGame();
                                                             }
                                                         }, game.timer.time-l.before);
                                                     }
                                                 });
-                                                bf.sendMessage(channelID, "Everyone has interacted and the game timer has started.");
+                                                bf.sendMessage(msg.channel, "Everyone has interacted and the game timer has started.");
                                             } else {
-                                                bf.sendMessage(channelID, "Everyone has interacted.");
+                                                bf.sendMessage(msg.channel, "Everyone has interacted.");
                                             }
                                             game.lastActive = Date.now();
                                             game.startedAt = Date.now();
@@ -695,56 +681,57 @@ module.exports = function(input) {
                                         }
                                     });
                                 });
-                                bf.sendMessage(channelID, "Please wait...", function(err, id) {
-                                    interactID = id;
+                                bf.sendMessage(msg.channel, "Please wait...").then(msg => {
+                                    interactMessage = msg;
                                     showInteractions();
                                 });
                                 function showInteractions() {
                                     let template = "**Players who have not finished interacting:**\n";
-                                    bf.editMessage(channelID, interactID, template+game.players.filter(p => !p.interacted).map(p => "<@"+p.userID+">").join("\n"));
+                                    bf.editMessage(interactMessage, template+game.players.filter(p => !p.interacted).map(p => "<@"+p.user.id+">").join("\n"));
                                 }
                             } else {
-                                bf.sendMessage(channelID, `<@${event.d.user_id}> You cannot start the game with ${game.players.length} ${cf.plural("player", game.players.length)}.`);
+                                bf.sendMessage(msg.channel, `You cannot start the game with ${game.players.length} ${cf.plural("player", game.players.length)}.`);
                                 //games = games.filter(g => g.channelID != game.channelID);
                             }
                         }}
                     ], (e,r) => {id = r});
                 }
                 function endGame() {
-                    let game = games.filter(g => g.channelID == channelID)[0];
+                    let game = games.find(g => g.channel.id == msg.channel.id);
                     if (!game) {
-                        bf.sendMessage(channelID, "There is no game in progress. Why not start a new one?", {mention: userID});
+                        bf.sendMessage(msg.channel, "There is no game in progress. Why not start a new one?");
                         return;
                     }
                     if (game.phase != "day") {
-                        bf.sendMessage(channelID, "The current game is not in a valid state to be stopped.", {mention: userID});
+                        bf.sendMessage(msg.channel, "The current game is not in a valid state to be stopped.");
                         return;
                     }
-                    bf.sendMessage(channelID, "The voting phase has started.");
+                    bf.sendMessage(msg.channel, "The voting phase has started.");
                     game.phase = "voting";
                     game.lastActive = Date.now();
                     game.players.forEach(p => {
-                        bot.mute({userID: p.userID, serverID: game.serverID});
+                        //bot.mute({userID: p.userID, serverID: game.serverID});
                         p.startVoting(game, function() {
                             let votesUsed = 0;
                             game.players.forEach(p => votesUsed += p.votesFor);
                             if (votesUsed == game.players.length) {
                                 let sortedPlayers = game.players.sort((a,b) => (b.votesFor-a.votesFor));
                                 let deadPlayers = (sortedPlayers[0].votesFor != 1 ? sortedPlayers.filter(p => p.votesFor == sortedPlayers[0].votesFor) : []);
+                                deadPlayers.forEach(p => p.alive = false);
                                 //let includedTeams = [];
                                 let teamStatus = {all: []};
                                 sortedPlayers.forEach(p => {
                                     //if (!includedTeams.map(t => t.name).includes(p.card.team.name)) includedTeams.push(p.card.team);
                                     teamStatus[p.card.team.name] = teamStatus[p.card.team.name] || [];
-                                    teamStatus[p.card.team.name].push(deadPlayers.map(p => p.userID).includes(p.userID) ? "dead" : "alive");
-                                    teamStatus["all"].push(deadPlayers.map(p => p.userID).includes(p.userID) ? "dead" : "alive");
+                                    teamStatus[p.card.team.name].push(deadPlayers.map(p => p.user.id).includes(p.user.id) ? "dead" : "alive");
+                                    teamStatus["all"].push(deadPlayers.map(p => p.user.id).includes(p.user.id) ? "dead" : "alive");
                                 });
-                                bf.reactionMenu(channelID,
+                                bf.reactionMenu(msg.channel,
                                     "**The vote results are in!**\n"+
                                     "Here are all the players, in order of votes:\n"+
-                                    sortedPlayers.map(p => (p.card.team.isWinner(game, teamStatus) ? "🏆" : "🥔")+
-                                                           (deadPlayers.map(p => p.userID).includes(p.userID) ? "💀" : "❤")+" "+
-                                    `**${p.votesFor}**: <@${p.userID}> (${p.originalCard.role} → ${p.card.role})`).join("\n")+"\n\n"+
+                                    sortedPlayers.map(p => (p.card.team.isWinner(game, teamStatus, p) ? "🏆" : "🥔")+
+                                                           (deadPlayers.map(p => p.user.id).includes(p.user.id) ? "💀" : "❤")+" "+
+                                    `**${p.votesFor}**: ${p.user.mention} (${p.originalCard.role} → ${p.card.role})`).join("\n")+"\n\n"+
                                     "Use the buttons to view more info or to start a new game.",
                                     //"Here are all the players that died:\n"+
                                     //cf.listify(deadPlayers.map(p => bot.users.get(p.userID).username), "Nobody (because everyone received exactly one vote).")+"\n"+
@@ -754,12 +741,12 @@ module.exports = function(input) {
                                         {emoji: bf.buttons["info"], ignore: "none", remove: "user", actionType: "js", actionData: function() {
                                             //TODO
                                         }},
-                                        {emoji: bf.buttons["redo"], allowedUsers: game.players.map(p => p.userID), ignore: "total", remove: "all", actionType: "js", actionData: function() {
-                                            startNewGame(game.players.map(p => p.userID));
+                                        {emoji: bf.buttons["redo"], allowedUsers: game.players.map(p => p.user.id), ignore: "total", remove: "all", actionType: "js", actionData: function() {
+                                            startNewGame(game.players.map(p => p.user));
                                         }}
                                     ]);
-                                games = games.filter(g => g.channelID != game.channelID);
-                                game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
+                                games = games.filter(g => g.channel.id != game.channel.id);
+                                //game.players.forEach(p => bot.unmute({userID: p.userID, serverID: game.serverID}));
                             }
                         });
                     });
