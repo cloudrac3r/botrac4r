@@ -140,7 +140,10 @@ bot.once("ready", function() { // Once the bot connects
     log(`Logged in as ${bot.user.username} (${bot.user.id})`, "info");
 });
 
-bot.on("messageCreate", function(msg) {
+bot.on("messageCreate", checkMessage);
+bot.on("messageUpdate", checkMessage);
+function checkMessage(msg) {
+    if (!msg.content) return;
     let message = msg.content;
     if (!bot.users.get(msg.author.id)) return; // Ignore "fake users"
     if (msg.author.bot) return; // Ignore other bots
@@ -181,20 +184,25 @@ bot.on("messageCreate", function(msg) {
                                                 `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
                                                 (target.longHelp ? "\n\n"+target.longHelp : ""));
                 } else {
+                    let commands = Object.values(bc).filter(c => !c.hidden);
                     if (!bf.isDMChannel(msg.channel)) bf.sendMessage(msg.channel, "DM sent.");
-                    bf.sendMessage(msg.author.id, bot.user.username+" uses things called *flags* and *switches*. "+
-                                                "These are to make it easier for you to specify options in your command without having to remember which order the options must be given in.\n"+
-                                                "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a feature.\n"+
-                                                "Switches are used by prefixing a word with another word connected with an equals sign, e.g. `size=4`. This allows you to specify that option anywhere in the command.\n"+
-                                                "If you don't want to use flags or switches, you can usually use positional arguments instead.")
-                    .then(() => bf.sendMessage(msg.author.id, "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
-                        Object.keys(bc).map(c => bc[c]).map(c => prefix+c.aliases[0]),
-                        Object.keys(bc).map(c => bc[c]).map(c => c.shortHelp)
-                    ], ["left", "left"])+"```"));
+                    bf.sendMessage(msg.author.id,
+                        "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
+                            commands.map(c => prefix+c.aliases[0]),
+                            commands.map(c => c.shortHelp)
+                        ], ["left", "left"])+"```"
+                    ).then(() => bf.sendMessage(msg.author.id,
+                        "For some commands, "+bot.user.username+" allows you to use things called **flags** and **switches**.\n"+
+                        "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a specific option.\n"+
+                        "Switches are used by connecting two words with an equals sign, e.g. `size=4`. This allows you to specify a certain value for an option.\n"+
+                        "The whole point of flags and switches is that they can be used **anywhere in the command** rather than needing to be in a specific order. "+
+                        "This is very helpful if you often forget the correct order for words in a certain command.\n"+
+                        "If you don't want to use flags or switches, you can usually use positional arguments instead."
+                    ));
                 }
             }
         }
     });
-});
+}
 
 bot.connect();

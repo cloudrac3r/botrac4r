@@ -32,6 +32,7 @@ module.exports = function(input) {
             reference: "[+lock|-lock] [list] [*#channel*] [time=*minutes*] [+sure] [+force]",
             longHelp: "",
             eris: true,
+            hidden: true,
             code: function(msg, command) {
                 if (!["176580265294954507", "113457314106740736"].includes(msg.author.id)) {
                     bf.sendMessage(msg.channel, "This command has not been enabled for you.", {mention: msg.author});
@@ -78,7 +79,7 @@ module.exports = function(input) {
                     let channelMention = command.regularWords.map(w => w.match(/<#([0-9]{16,})>/)).filter(w => w).map(w => w[1]);
                     command.regularWords.filter(w => w.match(/^`?#[a-z-]+`?$/)).forEach(w => {
                         w = w.replace("#", "").replace(/`/g, "");
-                        let found = Object.keys(channels).find(c => channels[c].name == w && channels[c].type == 0);
+                        let found = channels.find(c => c.name == w && c.type == 0);
                         if (w && found) channelMention.push(found);
                     });
                     if (channelMention.length) targets = channelMention;
