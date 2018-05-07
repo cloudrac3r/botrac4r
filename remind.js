@@ -15,7 +15,7 @@ module.exports = function(input) {
         timers.push(setTimeout(() => {
             let text = `<@${reminder.userID}> Ping! ${reminder.textTime} ago, `;
             if (reminder.text) text += `you asked me to remind you about this:\n${reminder.text}`;
-            else text += `you set a reminder. Press ${bf.buttons["up"]} to pin the original message so you can jump back there.`;
+            else text += `you set a reminder. Press ${bf.buttons["up"]} to temporarily pin the original message so you can jump back there.`;
             bf.reactionMenu(reminder.channelID, text, [
                 {emoji: bf.buttons["up"], remove: "user", actionType: "js", actionData: (msg, reactionMenus) => {
                     let messageObject = {channelID: reminder.channelID, messageID: reminder.messageID};
