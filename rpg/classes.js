@@ -134,7 +134,7 @@ module.exports = function(input) {
                 },
                 talk: (caller) => { // start an interactive dialogue, see the startDialogue method
                     if (!this.talkID) {
-                        return "You try to start a conversation, but "+this.name+" isn't interested.";
+                        return "You try to start a conversation, but **"+this.name+"** isn't interested.";
                     } else {
                         this.startDialogue(this.talkID, caller);
                         return "`";
@@ -275,7 +275,7 @@ module.exports = function(input) {
                         if (!this.equipment.melee) { // If you don't have a weapon...
                             return "You charge at your foe, but quickly realise that you aren't going to do much damage without a weapon.";
                         } else if (this.equipment.melee.tier > this.tiers[this.equipment.melee.attackType]) { // If the weapon's tier is too high...
-                            return "You attempt to raise your weapon, but suddenly it seems far too heavy to use. You can barely lift it from its holster, let alone swing it.";
+                            return "You attempt to raise your weapon, but suddenly it seems far too heavy to use. You can barely lift it from its holster, let alone use it.";
                         } else { // If all is well...
                             if (being) { // If you named something to attack...
                                 return this.equipment.melee.attack(being, attackType); // attack it.
@@ -292,7 +292,7 @@ module.exports = function(input) {
                     code: (item) => {
                         this.inventory.splice(item.index, 1); // Remove the item from your inventory
                         new Classes.WorldItem(item.item, this.room, this.subroom);
-                        return "Oops, I dropped `"+item.item.name+"`!";
+                        return "Oops, I dropped **"+item.item.name+"**!";
                     }
                 },
                 equip: { // Equip a held item
@@ -302,11 +302,11 @@ module.exports = function(input) {
                     code: (item) => {
                         let slot = item.item.attackType; // Name of the slot that the item belongs in
                         if (this.equipment[slot]) { // If that slot is filled...
-                            return "You already have an item in the slot `"+slot+"`.";
+                            return `The slot **${slot}** already contains **${this.equipment[slot]}**.`;
                         } else { // Otherwise...
                             this.inventory.splice(item.index, 1); // Remove the item from your inventory
                             this.equipment[slot] = item.item; // Add the item to equipment
-                            return "`"+item.item.name+"` was equipped into slot `"+slot+"`.";
+                            return `**${item.item.name}** was equipped into slot **${slot}**.`;
                         }
                     }
                 },
@@ -350,7 +350,7 @@ module.exports = function(input) {
                             this.navigateSubroomsMenu(room.subrooms, subroom.location, game.channel);
                             return "`";
                         } else {
-                            return "Couldn't find an exit or subroom matching `"+input+"`.";
+                            return "Couldn't find an exit or subroom matching **"+input+"**.";
                         }
                     }
                 },
@@ -447,11 +447,11 @@ module.exports = function(input) {
                         if (!being.receivables.take) {
                             return "You cannot take that object.";
                         } else if (being.subroom != this.subroom) {
-                            return "You must move to subroom "+being.subroom+" to take that item.";
+                            return "You must move to the subroom **"+being.subroom+"** to take that item.";
                         } else {
                             let item = being.receivables.take();
                             this.inventory.push(item);
-                            return "Got "+item.name;
+                            return "Got **"+item.name+"**.";
                         }
                     }
                 },
@@ -485,7 +485,7 @@ module.exports = function(input) {
                             if (!input.receivables.use) {
                                 return "You cannot use that object.";
                             } else if (input.subroom != this.subroom) {
-                                return "You must move to subroom "+input.subroom.location+" to use that object.";
+                                return "You must move to the subroom **"+input.subroom.location+"** to use that object.";
                             } else {
                                 return input.receivables.use(this);
                             }
@@ -505,7 +505,7 @@ module.exports = function(input) {
                             let item = this.equipment[slot];
                             this.inventory.push(this.equipment[slot]);
                             this.equipment[slot] = null;
-                            return "Unequipped item `"+item.name+"` from slot `"+slot+"`."; //TODO: Change this message
+                            return `**${item.name}** has been removed from slot **${slot}** and returned to your inventory.`;
                         }
                     }
                 },
@@ -603,7 +603,7 @@ module.exports = function(input) {
                     }}
                 ]).then(msg => {
                     notice.on("setLocation", cheatPrevent => {
-                        cheatPrevent(room, subroom, being, msg); //TODO
+                        cheatPrevent(room, subroom, being, msg); //TODO fix cheat prevention
                     });
                 });
             } else { // If a route wasn't found...
