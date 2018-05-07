@@ -299,7 +299,7 @@ module.exports = function(input) {
                     aliases: ["equip"],
                     expects: "item",
                     fail: "auto",
-                    code: (item) => { //TODO: Change up the success/failure messages to something neater
+                    code: (item) => {
                         let slot = item.item.attackType; // Name of the slot that the item belongs in
                         if (this.equipment[slot]) { // If that slot is filled...
                             return "You already have an item in the slot `"+slot+"`.";
@@ -366,7 +366,7 @@ module.exports = function(input) {
                         }};
                     }
                 },
-                look: { //TODO: comments
+                look: { // Look at something. See the comments.
                     aliases: ["look"],
                     expects: "being",
                     fail: "manual",
@@ -544,7 +544,7 @@ module.exports = function(input) {
                 ]
             }};
         }
-        navigateSubroomsMenu(subrooms, target, channel, callback) { //TODO: make sure this can't be exploited by leaving it open (listen for event, then close menu)
+        navigateSubroomsMenu(subrooms, target, channel, callback) {
             if (!callback) callback = new Function();
             let pastMoves = [];
             let cheatingDetected = false;

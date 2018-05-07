@@ -739,7 +739,7 @@ module.exports = function(input) {
                                     //includedTeams.map(t => `${t.name}
                                     [
                                         {emoji: bf.buttons["info"], ignore: "none", remove: "user", actionType: "js", actionData: function() {
-                                            //TODO
+                                            //TODO make the info button do something
                                         }},
                                         {emoji: bf.buttons["redo"], allowedUsers: game.players.map(p => p.user.id), ignore: "total", remove: "all", actionType: "js", actionData: function() {
                                             startNewGame(game.players.map(p => p.user));

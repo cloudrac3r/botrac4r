@@ -274,6 +274,6 @@ module.exports = function(input) {
         saveGame();
     }
     loadGame(() => {
-        bf.addTemporaryListener(bot, "messageCreate", __filename, messageEvent); //TODO: Change to Eris
+        bf.addTemporaryListener(bot, "messageCreate", __filename, messageEvent);
     });
 }
