@@ -47,14 +47,14 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/onuw.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/rpg/main.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
     },{
         filename: __dirname+"/beans/beans.js",
-        dest: "bot commands"
-    },{
-        filename: __dirname+"/rpg/main.js",
         dest: "bot commands"
     }*/
 ];

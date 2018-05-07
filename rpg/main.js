@@ -3,7 +3,7 @@ module.exports = function(input) {
     const fs = require("fs");
     let beings = [];
     const game = {
-        channel: "413152451345121280",
+        channel: "441910023501774858",
         admins: ["176580265294954507", "116718249567059974"]
     }
     let ut;
@@ -47,26 +47,13 @@ module.exports = function(input) {
         input.loadModules({filename: __filename, dest: "bot commands", watched: true});
     }
     function purge() {
-        bot.getMessages({channelID: game.channel, limit: 100}, function(err, arr) {
-            if (err) cf.log(err, "error");
+        bot.getMessages(game.channel, 100).then(arr => {
             if (arr.length == 0) {
-                bf.sendMessage(game.channel, "Channel purged.", function(e,id) {
-                    setTimeout(function() {
-                        bot.deleteMessage({channelID: game.channel, messageID: id});
-                    }, 10000);
-                });
+                bf.sendMessage(game.channel, "Channel purged.").then(msg => setTimeout(() => msg.delete(), 10000));
             } else if (arr.length > 1) {
-                bot.deleteMessages({channelID: game.channel, messageIDs: arr.map(m => m.id)}, function(err) {
-                    if (!err) purge();
-                    else if (err.response && err.response.message == "You are being rate limited.") setTimeout(purge, err.response.retry_after);
-                    else cf.log(err, "error");
-                });
+                bot.deleteMessages(game.channel, arr.map(m => m.id)).then(purge);
             } else {
-                bot.deleteMessage({channelID: game.channel, messageID: arr[0].id}, function(err) {
-                    if (!err) purge();
-                    else if (err.response && err.response.message == "You are being rate limited.") setTimeout(purge, err.response.retry_after);
-                    else cf.log(err, "error");
-                });
+                bot.deleteMessage(game.channel, arr[0].id).then(purge);
             }
         });
     }
@@ -145,27 +132,28 @@ module.exports = function(input) {
         return ut.partialMatch(name, b, ["fullName"]) || ut.partialMatch(name, b, ["name"]);
     }
     cf.rc = function(input) {
-        return messageEvent(bot.users.get("176580265294954507").username, "176580265294954507", game.channel, input, {console: true});
+        let msg = bf.fakeMessage({
+            channel_id: game.channel,
+            content: input,
+            author: bf.userObject(bf.users.cloud)
+        });
+        return messageEvent(msg, true);
     }
-    function messageEvent(messageObject) {
-        let user = messageObject.author.username, userID = messageObject.author.id, channelID = messageObject.channel.id, message = messageObject.content, event = {d: messageObject};
+    function messageEvent(msg, cli) {
+        let message = msg.content;
         function output(text) {
             if (text == "`") return; // Purposeful "don't output anything" dummy
-            if (text && text.embed) {
-                bf.sendMessage(channelID, undefined, text);
-            } else if (event.console) {
+            if (text) {
+                bf.sendMessage(msg.channel, text);
+            } else if (cli) {
                 cf.log(text, "responseInfo");
             } else {
-                if (text) {
-                    bf.sendMessage(channelID, text);
-                } else {
-                    bf.addReaction(channelID, event.d.id, "✅");
-                }
+                bf.addReaction(msg, "✅");
             }
         }
-        if (channelID != game.channel) return;
+        if (msg.channel.id != game.channel) return;
         // Run code or input regular commands
-        if (message.startsWith("=") && game.admins.includes(userID)) {
+        if (message.startsWith("=") && game.admins.includes(msg.author.id)) {
             message = message.slice(1);
             try {
                 let result = eval(message);
@@ -180,11 +168,11 @@ module.exports = function(input) {
         } else {
             // Choose player
             let player;
-            if (cf.sarg(message, 0) == "as" && game.admins.includes(userID)) {
+            if (cf.sarg(message, 0) == "as" && game.admins.includes(msg.author.id)) {
                 player = getBeing(cf.sarg(message, 1));
                 message = cf.sarg(message, "2-");
             } else {
-                player = beings.find(b => b.constructor.name == "Player" && b.userID == userID);
+                player = beings.find(b => b.constructor.name == "Player" && b.userID == msg.author.id);
             }
             // Misc special words
             if (cf.sarg(message, 0) == "load") {
@@ -221,7 +209,7 @@ module.exports = function(input) {
                 // Do actual stuff
                 if (!player) { // No player found
                     if (cf.sarg(message, 0) == "create") {
-                        player = new Classes.Player(cf.sarg(message, "1-"), userID, "start/bedroom", "");
+                        player = new Classes.Player(cf.sarg(message, "1-"), msg.author, "start/bedroom", "");
                         output("Created player "+player.fullName);
                     }
                 } else { // Player found
@@ -286,9 +274,6 @@ module.exports = function(input) {
         saveGame();
     }
     loadGame(() => {
-        bot.on("messageCreate", messageEvent); //TODO: Change to Eris
-    });
-    reloadEvent.once(__filename, () => {
-        bot.removeListener("messageCreate", messageEvent);
+        bf.addTemporaryListener(bot, "messageCreate", __filename, messageEvent); //TODO: Change to Eris
     });
 }

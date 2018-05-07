@@ -24,9 +24,8 @@ module.exports = function(input) {
     }
     function createSendableObject(input1, input2) {
         if (!input2) input2 = {};
-        if (typeof(input1) == "string") {
-            input1 = {content: input1};
-        }
+        if (typeof(input1) == "number") input1 += "";
+        if (typeof(input1) == "string") input1 = {content: input1};
         Object.assign(input1, input2);
         const contentKeys = ["content", "embed", "tts", "disableEveryone"];
         let content = {};
@@ -214,6 +213,21 @@ module.exports = function(input) {
             } else {
                 bot.once("ready", code);
             }
+        },
+        // Create a fake message object from as little information as possible.
+        fakeMessage(object) {
+            return new Discord.Message(Object.assign({
+                id: ((Date.now()-1420070400000)<<22).toString(),
+                timestamp: Date.now(),
+                edited_timestamp: null,
+                mention_everyone: false,
+                mentions: [],
+                mention_roles: [],
+                attachments: [],
+                embeds: [],
+                type: 0,
+                pinned: false
+            }, object), bot);
         },
         // Get a message from a channel.
         getMessage: function(channel, messageID, callback) {

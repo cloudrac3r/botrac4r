@@ -134,7 +134,7 @@ module.exports = function(input) {
                 },
                 talk: (caller) => { // start an interactive dialogue, see the startDialogue method
                     if (!this.talkID) {
-                        return "You open your mouth, but the look in "+this.name+"'s eyes informs you it would be better if you didn't say anything.";
+                        return "You try to start a conversation, but "+this.name+" isn't interested.";
                     } else {
                         this.startDialogue(this.talkID, caller);
                         return "`";
@@ -163,29 +163,32 @@ module.exports = function(input) {
         die(silently) {
             beings.splice(beings.map((o,i) => ({o,i})).find(o => o.o == this).i, 1);
             if (!silently) {
-                bot.sendMessage({to: game.channel, embed: {
-                    author: this.embedAuthor(),
-                    title: "Died.",
+                bf.sendMessage(game.channel, {embed: {
+                    title: "☠ "+(this.fullName || this.name),
+                    description: this.name+" died.",
                     color: 0xdd1d1d
                 }});
             }
         }
         embedAuthor() { // return name and avatar for display as author of an embed
             return {
-                name: this.fullName || this.name, // if you haven't seen the || operator before, it returns the first thing, but if there is no first thing, it moves on to the next thing
-                icon_url: (this.userID ? "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bot.users.get(this.userID).avatar+".jpg?size=32" : undefined) // if it's controlled by a player return the player's avatar
+                name: this.fullName || this.name, // if you haven't seen the || operator used like this before, it returns the first thing, but if there is no first thing, it moves on to the next thing
+                icon_url: (this.userID ? "https://cdn.discordapp.com/avatars/"+this.userID+"/"+bf.userObject(this.userID).avatar+".jpg?size=32" : undefined) // if it's controlled by a player return the player's avatar
             }
         }
         getItem(name) { // return a specific item and its position in this Being's inventory
             let inventory = this.inventory.map((i,k) => ({item: i, index: k}));
-            return ut.partialMatch(name, inventory, ["item", "name"], [
+            let result = ut.partialMatch(name, inventory, ["item", "name"], [
                 {position: 2, path: ["item", "constructor", "name"], code: (input, item) => (input.toLowerCase() == item.toLowerCase)}
             ]);
+            if (!result && Number(name) && name >= 1 && name <= inventory.length+1) result = inventory[1+name];
+            return result;
         }
         startDialogue(talkID, caller, callback) {
+            if (!callback) callback = new Function();
             let q = di[talkID];
             let current = q.start;
-            let mid;
+            let diaMsg;
             let lastReaction = 0;
             /*function getActions() {
                 return q.list[current].options.map((o,i) => {
@@ -213,13 +216,13 @@ module.exports = function(input) {
                 }
             }
             let showNextBox = () => { // Edit the message to the content from getEmbed
-                bf.editMessage(game.channel, mid, "", undefined, {embed: getEmbed()});
+                bf.editMessage(diaMsg, {embed: getEmbed()});
             }
-            let actionManager = (event) => { // Take actions based on button presses
-                let button = parseInt(event.d.emoji.name.split("_")[1])-1; // The number on the button - 1
+            let actionManager = (msg, emoji, user) => { // Take actions based on button presses
+                let button = parseInt(emoji.name.split("_")[1])-1; // The number on the button - 1
                 let choice = q.list[current].options[button]; // The information to act upon from the dialogue file
                 if (!choice) { // If the button wasn't an option...
-                    bf.removeReaction(game.channel, mid, event.d.emoji, event.d.user_id); // remove the user's reaction.
+                    //bf.removeReaction(msg, emoji, user); // remove the user's reaction.
                     return;
                 }
                 let codeOutput;
@@ -232,7 +235,7 @@ module.exports = function(input) {
                     current = choice.route; // go where the route says to go.
                 }
                 if (choice.route == "END") { // If you reached the end...
-                    bot.removeAllReactions({channelID: game.channel, messageID: mid}); // remove all buttons.
+                    msg.removeReactions(); // remove all buttons.
                     callback(); // we're done!
                 }
                 showNextBox(); // Something changed, so update the display
@@ -245,13 +248,13 @@ module.exports = function(input) {
             let actions = Object.values(q.list).sort((a,b) => b.options.length-a.options.length)[0].options.map((o,i) => ({
                 emoji: bf.buttons[i+1],
                 actionType: "js",
-                actionData: actionManager
+                actionData: actionManager,
+                remove: "user"
             }));
-            bf.sendMessage(game.channel, "", (err,id) => { // Send the inital menu
-                if (err) cf.log(err, "error");
-                mid = id;
-                bf.reactionMenu(game.channel, mid, actions);
-            }, {embed: getEmbed()});
+            bf.sendMessage(game.channel, {embed: getEmbed()}).then(msg => {
+                diaMsg = msg;
+                bf.reactionMenu(msg, actions);
+            });
         }
     }
     Classes.Player = class Player extends Classes.Being { // a Being controlled by a player
@@ -272,7 +275,7 @@ module.exports = function(input) {
                         if (!this.equipment.melee) { // If you don't have a weapon...
                             return "You charge at your foe, but quickly realise that you aren't going to do much damage without a weapon.";
                         } else if (this.equipment.melee.tier > this.tiers[this.equipment.melee.attackType]) { // If the weapon's tier is too high...
-                            return "You attempt to raise your weapon, but suddenly it seems far too heavy to use. You can barely lift it from its container, let alone swing it.";
+                            return "You attempt to raise your weapon, but suddenly it seems far too heavy to use. You can barely lift it from its holster, let alone swing it.";
                         } else { // If all is well...
                             if (being) { // If you named something to attack...
                                 return this.equipment.melee.attack(being, attackType); // attack it.
@@ -280,6 +283,16 @@ module.exports = function(input) {
                                 return "You hacked and you slashed, but without a target your efforts were wasted.";
                             }
                         }
+                    }
+                },
+                drop: { // Drop a held item
+                    aliases: ["drop"],
+                    expects: "item",
+                    fail: "auto",
+                    code: (item) => {
+                        this.inventory.splice(item.index, 1); // Remove the item from your inventory
+                        new Classes.WorldItem(item.item, this.room, this.subroom);
+                        return "Oops, I dropped `"+item.item.name+"`!";
                     }
                 },
                 equip: { // Equip a held item
@@ -305,7 +318,7 @@ module.exports = function(input) {
                         let il = input.toLowerCase(); // il: Input Lowercase, so that I don't repeat myself
                         let room = rooms[this.room]; // Details of the being's current room
                         let exit = room.exits.find(r => r.direction.startsWith(il) || r.aliases.includes(il)); // Find an exit matching input
-                        let target = rooms[exit.target];
+                        let target = exit && rooms[exit.target];
                         let subroom = room.subrooms && ut.partialMatch(input, room.subrooms, ["location"]); // Find a subroom matching input
                         if (exit) { // Input was an exit
                             return new Promise(resolve => { // When the output function receives a promise, it will return the output of the promise's resolution.
@@ -531,10 +544,20 @@ module.exports = function(input) {
                 ]
             }};
         }
-        navigateSubroomsMenu(subrooms, target, channelID, callback) { //TODO: make sure this can't be exploited by leaving it open (listen for event, then close menu)
+        navigateSubroomsMenu(subrooms, target, channel, callback) { //TODO: make sure this can't be exploited by leaving it open (listen for event, then close menu)
             if (!callback) callback = new Function();
             let pastMoves = [];
             let cheatingDetected = false;
+            let cheatPrevent = (room, subroom, being, msg) => {
+                if (being != this) return;
+                if (pastMoves.includes(subroom)) {
+                    pastMoves.splice(pastMoves.indexOf(subroom), 1);
+                } else {
+                    cheatingDetected = true;
+                    msg.removeReactions();
+                    bf.editMessage(msg, "Movement menu closed to prevent cheating.");
+                }
+            }
             let path = ut.findSubroomPath(subrooms, this.subroom, target); // use ut.findSubroomPath to figure out the route
             if (path) { // If a route was found...
                 path = [this.subroom].concat(path);
@@ -550,45 +573,41 @@ module.exports = function(input) {
                     }).join("\n");
                 }
                 let getCompleteMessage = (remaining) => { // a function which takes that path message and adds a little more info
-                    return "Found path through subrooms:```\n"+getPathMessage(path, this.subroom)+"```"+(remaining ? " "+remaining+" moves left." : " Reached destination.");
+                    return "Found path through subrooms:```\n"+getPathMessage(path, this.subroom)+"``` "+(remaining ? `${remaining} ${cf.plural("move", remaining)} left.` : "Reached destination.");
                 }
-                bf.reactionMenu(channelID, getCompleteMessage(path.length-1), [ // reaction menu internals are hard to explain, so I won't :hippo:
-                    {emoji: bf.buttons["tick"], remove: "all", ignore: "total", actionType: "js", actionData: (event) => {
+                bf.reactionMenu(channel, getCompleteMessage(path.length-1), [ // reaction menu internals are hard to explain, so I won't :hippo:
+                    {emoji: bf.buttons["tick"], remove: "all", ignore: "total", actionType: "js", actionData: (msg, emoji, user) => {
                         if (!cheatingDetected) {
                             path.slice(1).forEach(p => { // For each point on the route,
                                 pastMoves.push(p);
                                 this.setLocation(undefined, p); // go there.
                             });
-                            bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(0)); // edit the message to show completion
+                            bf.editMessage(msg, getCompleteMessage(0)); // edit the message to show completion
+                            notice.removeListener("setLocation", cheatPrevent); // remove the cheat detector
                             callback(); // callback success
                         }
                     }},
-                    {emoji: bf.buttons["down"], remove: "user", actionType: "js", actionData: (event) => {
+                    {emoji: bf.buttons["down"], remove: "user", actionType: "js", actionData: (msg, emoji, user) => {
                         if (!cheatingDetected) {
                             let nextIndex = path.indexOf(this.subroom)+1;
                             pastMoves.push(path[nextIndex]);
                             this.setLocation(undefined, path[nextIndex]); // go the next point on the route
                             let remaining = [...path].reverse().indexOf(this.subroom); // the number of remaining points on the route
                             if (nextIndex == path.length-1) { // If you're at the destination...
-                                bot.removeAllReactions({channelID, messageID: event.d.message_id}); // remove all reactions on the message,
+                                msg.removeReactions(); // remove all reactions on the message,
+                                notice.removeListener("setLocation", cheatPrevent); // remove the cheat detector,
                                 setImmediate(callback); // and callback as soon as possible.
                             }
-                            bf.editMessage(event.d.channel_id, event.d.message_id, getCompleteMessage(remaining)); // edit the message to show progress
+                            bf.editMessage(msg, getCompleteMessage(remaining)); // edit the message to show progress
                         }
                     }}
-                ], (err, id) => {
-                    notice.on("setLocation", (room, subroom, being) => {
-                        if (pastMoves.includes(subroom)) {
-                            pastMoves.splice(pastMoves.indexOf(subroom), 1);
-                        } else {
-                            cheatingDetected = true;
-                            bot.removeAllReactions({channelID, messageID: id});
-                            bf.editMessage(channelID, id, "Movement menu closed to prevent cheating.");
-                        }
+                ]).then(msg => {
+                    notice.on("setLocation", cheatPrevent => {
+                        cheatPrevent(room, subroom, being, msg); //TODO
                     });
                 });
             } else { // If a route wasn't found...
-                bf.sendMessage(channelID, "Couldn't navigate from "+this.subroom+" to "+target+" through subrooms."); // just fail, without callback
+                bf.sendMessage(channel, "Couldn't navigate from "+this.subroom+" to "+target+" through subrooms."); // just fail, without callback
             }
         }
     }
@@ -681,7 +700,7 @@ module.exports = function(input) {
                         code: (target) => {
                             target.receivables.hurt(this.power);
                             // This return value is passed back through about 5 billion functions to eventually be spat out into chat as-is.
-                            return "Dealt "+this.power+" damage to "+target.name;
+                            return "Dealt "+this.power+" damage to "+target.name+".";
                         }
                     }
                 ];
@@ -693,7 +712,7 @@ module.exports = function(input) {
              */
             if (!attackType) attackType = 1; // If not specified, use the first attack.
             if (attackType > this.attacks.length) { // If attackType is out of range...
-                return "You tried to do something new, cool and fancy, but failed horribly."; // :hippo:
+                return "You tried to do something new, cool and fancy, but failed horribly. Perhaps you should stick with what you know how to do."; // :hippo:
             } else { // If attackType is in range...
                 return this.attacks[attackType-1].code(target); // Perform the requested attack.
             }
