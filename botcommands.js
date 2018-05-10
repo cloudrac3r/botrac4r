@@ -298,7 +298,7 @@ module.exports = function(input) {
             longHelp: "This time is reset whenever the bot goes offline and comes back online, or a full restart is performed (full restarts are silent).",
             eris: true,
             code: function(msg, command) {
-                bf.sendMessage(msg.channel, "Bot uptime: "+prettyMs(process.uptime()*1000), {mention: msg.author});
+                bf.sendMessage(msg.channel, "Bot uptime: "+prettyMs(Math.floor(process.uptime())*1000), {mention: msg.author});
             }
         },
         "vote": {
@@ -346,6 +346,72 @@ module.exports = function(input) {
                 ctx.fillRect(0, 0, 200, 200);
                 let buffer = canvas.toBuffer();
                 bf.sendMessage(msg.channel, "#"+colour, {file: buffer, filename: colour+".png", mention: msg.author});
+            }
+        },
+        "partners": {
+            aliases: ["partners", "friends"],
+            shortHelp: "Some friendly bots and humans you might be interested in",
+            reference: "",
+            longHelp: "",
+            eris: true,
+            code: function(msg, command) {
+                bf.sendMessage(msg.channel, {embed: {
+                    title: "Partners",
+                    description: bot.user.username+" is friends with various other bots and humans. Check them out!",
+                    fields: [
+                        {
+                            title: "[Amanda](https://amandabot.ga/) <:bot:412413027565174787>",
+                            description: "some general purpose bot idk"
+                        }
+                    ]
+                }});
+            }
+        },
+        "ddr": {
+            aliases: ["ddr", "stepmania", "stepchart"],
+            shortHelp: "Convert a list of notes to some pretty-looking arrows.",
+            reference: "*notes*",
+            longHelp: "Specify notes as something like this:\n"+
+                      ".. .\n  . \n..  \n   .\n. . \n .  \n"+
+                      "Periods (.) are interpreted as regular notes. Anything else is interpreted as empty space.",
+            eris: true,
+            code: function(msg, command) {
+                function getNote(colour, direction) {
+                    let emojiObject = bf.guildObject("389550838143516672").emojis.find(e => e.name == `ddr_${colour}_${direction}`);
+                    return `<:${emojiObject.name}:${emojiObject.id}>`
+                }
+                const columns = ["left", "down", "up", "right"];
+                const colours = {
+                    "1": "red",
+                    "2": "blue",
+                    "3": "green",
+                    "4": "yellow",
+                    "6": "purple"
+                };
+                const colourPatterns = {
+                    "1": [1],
+                    "2": [1, 2],
+                    "3": [1, 3, 3],
+                    "4": [1, 4, 2, 4],
+                    "6": [1, 6, 3, 6, 3, 6, 1]
+                };
+
+                let lines = command.input.split("\n");
+                let speed = 0;
+                if (command.numbers.length == 1) {
+                    speed = parseInt(command.numbers[0]);
+                    lines = lines.slice(1);
+                }
+                if (!colourPatterns[speed]) speed = 4;
+                let output = "<:ddr_key_left:444076173765640202><:ddr_key_down:444076173836681216><:ddr_key_up:444076173673234433><:ddr_key_right:444076173631160320>\n";
+                output += lines.map((line, li) => {
+                    let lineColour = colours[colourPatterns[speed][li%speed]];
+                    return line.split("").map((letter, i) => {
+                        if (letter == ".") return getNote(lineColour, columns[i%4]);
+                        else return "<:bl:230481089251115018>";
+                    }).join("");
+                }).join("\n");
+                bf.sendMessage(msg.channel, output);
             }
         }
     };
