@@ -73,7 +73,7 @@ module.exports = {
         if (!altSplit) altSplit = ";";
         let output = {prefix: prefix, split: split, altSplit: altSplit, name: name};
         output.input = input;
-        output.words = input.split(split);
+        output.words = input.replace(split, "\n").split("\n");
         output.regularWords = output.words.filter(i => !i.match(/^[+-][a-z]/i) && !i.match(/\w=[^\s]/));
         output.nonNumbers = output.regularWords.filter(i => parseFloat(i) != i);
         output.altWords = output.regularWords.join(split).split(altSplit).map(i => module.exports.trim(i, split));

@@ -160,12 +160,26 @@ function checkMessage(msg) {
         let { prefix, seperator, altSeperator, isRegex } = dbr;
         //log(event, "info");
         let mp;
+        let noncommand;
         if (isRegex) {
             if (message.match(prefix)) mp = message.split(message.match(prefix)[0]).join("").split(seperator);
         } else {
-            if (message.startsWith(prefix)) mp = message.slice(prefix.length).split(seperator);
+            if (message.startsWith(prefix)) {
+                let match = message.slice(prefix.length).match(new RegExp(`^(.*?)(?:${seperator}|\n)(.*)$`, "ms"));
+                if (match) {
+                    mp = [match[1]].concat(match[2].split(seperator));
+                    noncommand = match[2];
+                } else {
+                    mp = [message.slice(prefix.length)];
+                    noncommand = "";
+                }
+            }
         }
-        if (mp) {
+        if (mp && mp[0]) {
+            if (mp[0].includes("\n")) {
+                let word = mp.shift();
+                mp.unshift(...word.split("\n"));
+            }
             Object.values(bc).forEach(command => { // Find a bot command whose alias matches
                 if (command.aliases.includes(mp[0])) {
                     if (command.eris) {
