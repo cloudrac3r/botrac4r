@@ -16,7 +16,7 @@ module.exports = function(input) {
         },*/
         roll: {
             aliases: ["roll", "dice", "random", "rng"],
-            shortHelp: "Pick a random number.",
+            shortHelp: "Pick a random number",
             reference: "[[min=]*minimumNumber*] [[max=]*maximumNumber*] [message]",
             longHelp: "The first number in the message (or the min= switch) is the lowest number that can be picked, defaulting to 1.\n"+
                       "The second number in the message (or the max= switch) is the highest number that can be picked.\n"+
@@ -42,7 +42,7 @@ module.exports = function(input) {
         },
         choose: {
             aliases: ["choose", "choice", "pick"],
-            shortHelp: "Choose one items from a list.",
+            shortHelp: "Choose an item from a list",
             reference: "[+t *title*] *item1* [*item2*] [*item3*] [*...*]",
             longHelp: "Put a series of words seperated by AS to choose exactly one of them.",
             eris: true,
@@ -60,7 +60,7 @@ module.exports = function(input) {
         },
         temp: {
             aliases: ["temp", "temperature", "celsius", "farenheit"],
-            shortHelp: "Convert a temperature from Celsius to Farenheit or vice-versa.",
+            shortHelp: "Convert a temperature between Celsius and Farenheit",
             reference: "*temperature*",
             longHelp: "Put exactly one number without a unit and it will be converted in both directions.",
             eris: true,
@@ -82,7 +82,7 @@ module.exports = function(input) {
         },
         yesno: {
             aliases: ["yn", "yesno", "8ball"],
-            shortHelp: "Answer a question with yes or no.",
+            shortHelp: "Answer a question with yes or no",
             reference: "[*question*] [[yes=]*percentage*] [no=*percentage*]",
             longHelp: "Supply a number to change the percentage chance of picking yes. Default chance is 50. (Supply numbers without the % sign.)",
             eris: true,
@@ -104,7 +104,7 @@ module.exports = function(input) {
         },
         setup: {
             aliases: ["configure", "setup", "prefix", "option", "options", "settings"],
-            shortHelp: "Configure your prefix and split preferences.",
+            shortHelp: "Configure botrac4r options like your prefix",
             reference: "",
             longHelp: "A menu will appear allowing you to change settings.",
             eris: true,
@@ -220,7 +220,7 @@ module.exports = function(input) {
         },
         flag: {
             aliases: ["flag"],
-            shortHelp: "Create a miniature US flag using emojis.",
+            shortHelp: "Create a miniature US flag using emojis",
             reference: "blue=*blueEmoji* red=*redEmoji* white=*whiteEmoji* [[size=]*size*]",
             longHelp: "Supply three different emojis along with their colours using command switches, and an optional size.",
             eris: true,
@@ -287,7 +287,7 @@ module.exports = function(input) {
             longHelp: "",
             eris: true,
             code: function(msg, command) {
-                bf.sendMessage(msg.channel, "You can use this link to add botrac4r to any server: <https://discordapp.com/oauth2/authorize?client_id=353703396483661824&scope=bot>\n"+
+                bf.sendMessage(msg.channel, "You can use this link to add botrac4r to any server that you have Manage Server permissions on: <https://discordapp.com/oauth2/authorize?client_id=353703396483661824&scope=bot>\n"+
                                             "To work properly, it will need additional permissions. Giving it Administrator will give it all the permissions it needs, though you can probably get by with just Manage Messages.");
             }
         },
@@ -369,7 +369,7 @@ module.exports = function(input) {
         },
         "ddr": {
             aliases: ["ddr", "stepmania", "stepchart"],
-            shortHelp: "Convert a list of notes to some pretty-looking arrows.",
+            shortHelp: "Convert a list of notes to pretty arrows",
             reference: "*notes*",
             longHelp: "Specify notes as something like this:\n"+
                       ".. .\n  . \n..  \n   .\n. . \n .  \n"+

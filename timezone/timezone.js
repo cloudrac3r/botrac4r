@@ -5,7 +5,7 @@ module.exports = function(input) {
     let availableFunctions = {
         timezone: {
             aliases: ["timezone", "time", "localtime", "tz"],
-            shortHelp: "Find the local time of another user.",
+            shortHelp: "Find the local time of another user",
             reference: "*@mention*",
             longHelp: "Mention a user, and if they have set their time zone, you will be told their local time.",
             eris: true,
@@ -28,7 +28,7 @@ module.exports = function(input) {
         },
         setTimezone: {
             aliases: ["settimezone", "settime", "settz", "stz", "setlocaltime", "slocaltime"],
-            shortHelp: "Set your own local time zone.",
+            shortHelp: "Set your own local time zone",
             reference: "[-]*hours*:*minutes*",
             longHelp: "Set your time zone by naming its offset compared to UTC time in hours and minutes. For example, Pacific Time is `-8:00`, Eastern Time is `-5:00` and England is `0:00`.",
             eris: true,

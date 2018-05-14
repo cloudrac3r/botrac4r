@@ -28,7 +28,7 @@ module.exports = function(input) {
     let availableFunctions = {
         lock: {
             aliases: ["lock"],
-            shortHelp: "Lock yourself out of a channel.",
+            shortHelp: "Lock yourself out of a channel",
             reference: "[+lock|-lock] [list] [*#channel*] [time=*minutes*] [+sure] [+force]",
             longHelp: "",
             eris: true,
