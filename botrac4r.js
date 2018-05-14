@@ -50,6 +50,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/rpg/main.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/todo.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
@@ -74,11 +77,16 @@ let sqlite = require("sqlite3");
 let db = new sqlite.Database(__dirname+"/botrac4r.db");
 
 let bot = new Discord(token); // Log in bot
-loadModules(); // Actually load the modules
-let log = cf.log; // Shortcut to log
+function log(data, type) {
+    if (cf.log) cf.log(data, type);
+    else console.log(data);
+}
 
-//let bf = require("./commonbot.js")(bot, cf); // Common bot functions
-//let bc = require("./botcommands.js")(bot, cf, bf); // Complete bot commands
+const destinations = {
+    "common": filename => Object.assign(cf, require(filename)),
+    "bot framework": filename => Object.assign(bf, require(filename)({Discord, bot, cf, db, reloadEvent, loadModule})),
+    "bot commands": filename => Object.assign(bc, require(filename)({Discord, bot, cf, bf, db, reloadEvent, loadModule}))
+}
 
 let stdin = process.stdin; // Use the terminal to run JS code
 stdin.on("data", function(input) {
@@ -92,45 +100,28 @@ stdin.on("data", function(input) {
     }
 });
 
-// Load modules when function called and when their files are modified
-function loadModules(module) {
-    let mods = modules; // List of modules, defaults to global variable modules, overridden by function parameter
-    if (module) mods = [module];
-    mods.forEach(m => {
-        if (cf.log) {
-            cf.log("Loading module "+m.filename, "info");
-        } else {
-            console.log("Loading module "+m.filename);
-        }
-        try {
-            reloadEvent.emit(m.filename);
-            delete require.cache[require.resolve(m.filename)]; // Otherwise it loads from the cache and ignores file changes
-            switch (m.dest) { // Do different things depending on its purpose
-            case "common":
-                Object.assign(cf, require(m.filename)); // Load it into common functions
-                break;
-            case "bot framework":
-                Object.assign(bf, require(m.filename)({Discord, bot: bot, cf: cf, db: db, reloadEvent: reloadEvent})); // Load it into bot framework
-                break;
-            case "bot commands":
-                Object.assign(bc, require(m.filename)({Discord, bot, cf, bf, db, reloadEvent, loadModules})); // Load it as bot commands
-                break;
-            }
-        } catch (e) {
-            if (cf.log) {
-                cf.log("Failed to reload module "+m.filename+"\n"+e.stack, "error");
-            } else {
-                console.log("Failed to reload module "+m.filename+"\n"+e.stack);
-            }
-        }
-        if (!m.watched) { // If file isn't already being watched,
-            m.watched = true;
-            fs.watchFile(m.filename, {interval: 2007}, function() { // watch it.
-                loadModules(m);
-            });
-        }
+// Load modules on bot start and when they are modified
+function loadModule(m) {
+    try {
+        reloadEvent.emit(m.filename); // Allow the module to detect the reload
+        delete require.cache[require.resolve(m.filename)]; // Otherwise it loads from the cache and ignores file changes
+        destinations[m.dest](m.filename); // Load it!
+        log("Loading module "+m.filename, "info"); // If we got here: success!
+    } catch (e) {
+        log("Failed to reload module "+m.filename+"\n"+e.stack, "error"); // If we got here: error.
+    }
+}
+function watchModule(m) {
+    fs.watchFile(m.filename, {interval: 2000}, () => {
+        loadModule(m);
     });
 }
+(function loadModules() {
+    modules.forEach(m => {
+        loadModule(m);
+        watchModule(m);
+    });
+})();
 
 bot.on("ready", function() {
     bot.editStatus("online", {name: defaultPrefix + "help", type: 0});
@@ -155,7 +146,7 @@ function checkMessage(msg) {
         if (!dbr) {
             //bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, isRegex: 0, seperator: defaultSeperator, altSeperator: defaultAltSplit};
-            db.run("INSERT INTO Users VALUES (?, ?, 0, ?, ?, ?, 0)", [userID, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
+            db.run("INSERT INTO Users VALUES (?, ?, 0, ?, ?, ?, 0)", [msg.author.id, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
         }
         let { prefix, seperator, altSeperator, isRegex } = dbr;
         //log(event, "info");
