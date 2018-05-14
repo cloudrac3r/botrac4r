@@ -44,7 +44,7 @@ module.exports = function(input) {
         process.exit();
     }
     function reload() {
-        input.loadModules({filename: __filename, dest: "bot commands", watched: true});
+        input.loadModule({filename: __filename, dest: "bot commands"});
     }
     function purge() {
         bot.getMessages(game.channel, 100).then(arr => {
