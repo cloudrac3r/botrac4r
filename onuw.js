@@ -401,11 +401,12 @@ module.exports = function(input) {
         }
     }
     const cardSets = {
+        1: [new Seer(), new Seer(), new Seer(), new Seer()],
         2: [new Werewolf(), new Werewolf(), new Werewolf(), new Werewolf(), new Werewolf()],
         3: [new Robber(), new Troublemaker(), new Insomniac(), new Seer(), new Drunk(), new DreamWolf()],
-        4: [new Robber(), new Troublemaker(), new Insomniac(), new Tanner(), new Drunk(), new Tanner(), new Seer],
-        5: [new Werewolf(), new MysticWolf(), new Insomniac(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason()],
-        6: [new Werewolf(), new Werewolf(), new DreamWolf(), new Robber(), new Seer(), new Troublemaker(), new Mason(), new Mason(), new Drunk()]
+        4: [new Werewolf(), new Werewolf(), new Robber(), new Troublemaker(), new Seer(), new Tanner(), new Seer],
+        5: [new Werewolf(), new Werewolf(), new Robber(), new Troublemaker(), new Seer(), new Tanner(), new Mason(), new Mason()],
+        6: [new Werewolf(), new Werewolf(), new Robber(), new Troublemaker(), new Seer(), new Tanner(), new Mason(), new Mason(), new Drunk()]
     };
     Object.keys(cardSets).filter(n => cardSets[n].length-3 != n).forEach(n => {
         cf.log("ONUW role set "+n+" does not have the correct array length.", "error");
@@ -544,6 +545,8 @@ module.exports = function(input) {
                     startNewGame();
                 } else if (["check", "info", "detail"].some(w => command.input.toLowerCase().includes(w))) {
                     check(msg.channel);
+                } else if (["explain", "rules"].some(w => command.input.toLowerCase().includes(w))) {
+                    bf.sendMessage(msg.channel, "http://fully-faltoo.com/uploads/werewolf.pdf");
                 } else if (["timer", "time"].some(w => command.input.toLowerCase().includes(w))) {
                     let game = games.find(g => g.channel.id == msg.channel.id);
                     if (game) {
