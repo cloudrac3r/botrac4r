@@ -4,10 +4,10 @@ const userEmojiMessage = {channelID: "434994415342321674", messageID: "434994502
 let reactionMenus = {};
 let messageMenus = [];
 let warningIgnore = [];
+let DMChannelCache = {};
 
 module.exports = function(input) {
     let {Discord, bot, cf, db, reloadEvent} = input;
-    let userEmojis = {};
     let reactionMenus = {};
     let messageMenus = [];
 
@@ -36,6 +36,7 @@ module.exports = function(input) {
     }
 
     let bf = {
+        userEmojis: {},
         messageCharacterLimit: 2000,
         // Button reactions.
         buttons: { // {(<:([a-z0-9_]+):[0-9]+>) ?} / {"\2": "\1",\n        }
@@ -77,7 +78,8 @@ module.exports = function(input) {
             "no": "<:bn_no:331164190284972034>",
             "blank": "<:bn_bl:330501355737448450>",
             "green tick": "✅",
-            "green cross": "❎"
+            "green cross": "❎",
+            "bot tag": "<:bot:412413027565174787>"
         },
         // Check if a channel is a direct message or in a server.
         isDMChannel: function(channel) {
@@ -114,7 +116,10 @@ module.exports = function(input) {
                 if (bf.channelObject(channel)) {
                     resolve(bf.channelObject(channel));
                 } else if (bf.userObject(channel)) {
-                    bot.getDMChannel(bf.userObject(channel).id).then(c => {
+                    let userID = bf.userObject(channel).id;
+                    if (DMChannelCache[userID]) resolve(DMChannelCache[userID]);
+                    else bot.getDMChannel(userID).then(c => {
+                        DMChannelCache[userID] = c;
                         resolve(c);
                     });
                 } else {
@@ -176,6 +181,11 @@ module.exports = function(input) {
                 throw "Unknown format for channel; cannot get name";
             }
         },
+        ceregex: /^<a?:([a-zA-Z0-9_-]{2,32}):([0-9]+)>$/,
+        matchEmoji: function(input) {
+            let match = input.match(bf.ceregex);
+            return match;
+        },
         // Fix emojis so they can be used by Eris.
         fixEmoji: function(input) {
             if (typeof(input) == "object") {
@@ -185,8 +195,7 @@ module.exports = function(input) {
                     return input.name;
                 }
             } else if (typeof(input) == "string") {
-                let ceregex = /^<a?:([a-zA-Z0-9_-]{2,32}):([0-9]+)>$/;
-                let match = input.match(ceregex);
+                let match = bf.matchEmoji(input);
                 if (match) {
                     return match[1]+":"+match[2];
                 } else {
@@ -196,6 +205,17 @@ module.exports = function(input) {
                 console.log(input);
                 console.log(typeof(input));
                 throw "Unknown format for emoji; cannot convert";
+            }
+        },
+        stringifyEmoji: function(input) {
+            if (typeof(input) == "object") {
+                if (input.id) {
+                    return "<"+(input.animated ? "a" : "")+":"+input.name+":"+input.id+">";
+                } else {
+                    return input.name;
+                }
+            } else {
+                return input;
             }
         },
         addTemporaryListener: function(target, name, filename, code) {
@@ -348,15 +368,26 @@ module.exports = function(input) {
         // Add multiple reactions to a message, in order.
         addReactions: function() {
             return bf.withOptionalChannel(arguments)
-            .then(([channel, message, reactions, callback]) => new Promise(resolve => {
+            .then(([channel, message, reactions, callback, cancelEvent]) => new Promise(resolve => {
                 if (!callback) callback = new Function();
+                let cancelled = false;
+                if (cancelEvent) cancelEvent.once("cancel", () => {
+                    cancelled = true;
+                });
                 (function addNextReaction() {
                     bf.addReaction(channel, message, reactions[0]).then(() => {
-                        reactions.shift();
-                        if (reactions[0]) addNextReaction();
-                        else {
+                        if (cancelled) {
+                            bf.removeReaction(channel, message, reactions[0]);
                             callback(null);
                             resolve();
+                        } else {
+                            reactions.shift();
+                            if (reactions[0]) addNextReaction();
+                            else {
+                                callback(null);
+                                resolve();
+                                if (cancelEvent) cancelEvent.removeAllListeners();
+                            }
                         }
                     }).catch(err => {
                         callback(err);
@@ -424,8 +455,9 @@ module.exports = function(input) {
         // Create a reaction menu
         reactionMenu: function() {
             return bf.withOptionalChannel(arguments)
-            .then(([channel, message, actions, callback]) => {
+            .then(([channel, message, actions, callback, cancelEvent]) => {
                 if (!callback) callback = new Function();
+                if (!cancelEvent) cancelEvent = new events.EventEmitter();
                 actions = actions.map(a => {
                     a.emoji = bf.fixEmoji(a.emoji);
                     if (a.allowedUsers) a.allowedUsers = a.allowedUsers.map(u => bf.userObject(u).id);
@@ -444,11 +476,11 @@ module.exports = function(input) {
                     bf.getMessage(channel, message).then(msg => callback(null, msg));
                     let promise;
                     if (channel) {
-                        promise = bf.addReactions(channel, message, actions.map(a => a.emoji));
+                        promise = bf.addReactions(channel, message, actions.map(a => a.emoji), new Function(), cancelEvent);
                     } else {
-                        promise = bf.addReactions(message, actions.map(a => a.emoji));
+                        promise = bf.addReactions(message, actions.map(a => a.emoji), new Function(), cancelEvent);
                     }
-                    reactionMenus[messageID] = {actions, channelID};
+                    reactionMenus[messageID] = {actions, channelID, cancelEvent};
                     promise.catch(() => {
                         delete reactionMenus[messageID];
                     });
@@ -566,7 +598,7 @@ module.exports = function(input) {
         if (!menu) return;
         let action = menu.actions.find(a => a.emoji == fixedEmoji);
         if (!action) return;
-        if (action.allowedUsers && !action.allowedUsers.includes(user.id)) {
+        if ((action.allowedUsers && !action.allowedUsers.includes(user.id)) || (action.deniedUsers && action.deniedUsers.includes(user.id))) {
             if (action.remove == "user") bf.removeReaction(msg, fixedEmoji, user);
             return;
         }
@@ -581,7 +613,7 @@ module.exports = function(input) {
             action.actionData({d: msg}, reactionMenus);
             break;
         case "js":
-            action.actionData(msg, emoji, user, reactionMenus);
+            action.actionData(msg, emoji, user, menu.cancelEvent, reactionMenus);
             break;
         }
         switch (action.ignore) {
@@ -616,6 +648,7 @@ module.exports = function(input) {
             msg.delete();
             break;
         }
+        if (action.cancel) menu.cancelEvent.emit("cancel");
         //cf.log("New reaction on reaction menu: "+emoji, "warning");
     });
     bf.addTemporaryListener(bot, "messageCreate", __filename, msg => {
@@ -627,6 +660,16 @@ module.exports = function(input) {
             menu.action(msg);
             messageMenus = messageMenus.filter(m => !isDesiredMenu(m));
         }
+    });
+
+    // Get user emojis
+    bf.onBotConnect(() => {
+        bf.getMessage(userEmojiMessage.channelID, userEmojiMessage.messageID).then(msg => {
+            msg.content.split("\n").forEach(line => {
+                let [userID, emoji] = line.split(" ");
+                bf.userEmojis[userID] = emoji;
+            });
+        });
     });
 
     return bf;

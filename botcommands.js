@@ -349,7 +349,7 @@ module.exports = function(input) {
             }
         },
         "partners": {
-            aliases: ["partners", "friends"],
+            aliases: ["partners", "partner", "friends"],
             shortHelp: "Some friendly bots and humans you might be interested in",
             reference: "",
             longHelp: "",
@@ -360,8 +360,9 @@ module.exports = function(input) {
                     description: bot.user.username+" is friends with various other bots and humans. Check them out!",
                     fields: [
                         {
-                            title: "[Amanda](https://amandabot.ga/) <:bot:412413027565174787>",
-                            description: "some general purpose bot idk"
+                            name: "Amanda <:bot:412413027565174787>",
+                            value: "An adorable general-purpose bot featuring money, music, images, and interactions.\n"+
+                                   "[Website](https://amandabot.ga/) | [Server](http://papishouse.discords.ga/) | [Invite](http://amanda.discord-bots.ga/)"
                         }
                     ]
                 }});
@@ -412,6 +413,37 @@ module.exports = function(input) {
                     }).join("");
                 }).join("\n");
                 bf.sendMessage(msg.channel, output);
+            }
+        },
+        "whoisthat": {
+            aliases: ["whoisthat", "identify"],
+            shortHelp: "Translate an avatar emoji to a mention",
+            reference: "",
+            longHelp: "",
+            eris: true,
+            code: function(msg, command) {
+                let recent = [];
+                bot.getMessages(msg.channel.id).then(messages => {
+                    messages = messages.slice(0, 10);
+                    messages.forEach(m => {
+                        Object.keys(m.reactions).forEach(r => {
+                            Object.entries(bf.userEmojis).forEach(e => {
+                                if (bf.fixEmoji(e[1]) == r) {
+                                    let a = m.reactions[r].animated ? "a" : "";
+                                    recent.push({emoji: e[1], userID: e[0]});
+                                }
+                            });
+                        });
+                    });
+                    if (recent.length) {
+                        bf.sendMessage(msg.channel, {embed: {
+                            title: "Recent user emoji reactions",
+                            description: recent.map(r => `${r.emoji} <@${r.userID}>`).join("\n")
+                        }});
+                    } else {
+                        bf.sendMessage(msg.channel, "idk", {mention: msg.author});
+                    }
+                });
             }
         }
     };
