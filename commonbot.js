@@ -403,8 +403,13 @@ module.exports = function(input) {
                 user = user ? bf.userObject(user).id : undefined;
                 if (!callback) callback = new Function();
                 reaction = bf.fixEmoji(reaction);
+                let useChannelID = !!channel; // If channel was specified, that means message is only an ID
+                if (!message.removeReaction) { // However, message may not be a full message object, in which case channelID/messageID should be used
+                    useChannelID = true;
+                    channel = message.channel;
+                }
                 let promise;
-                if (channel) {
+                if (useChannelID) {
                     if (typeof(message) == "object") message = message.id;
                     promise = bot.removeMessageReaction(channel.id, message, reaction, user);
                 } else {
@@ -534,9 +539,7 @@ module.exports = function(input) {
                     switch (err.code) {
                     case 50013:
                         cf.log(`Missing permissions to pin message ${message} in ${bf.nameOfChannel(channel)} (${channel.id})`, "error");
-                        bf.sendMessage(channel, `I tried to pin a message, but I lack permissions. Please give me a role with "Manage Permissions".`).then(msg => {
-                            setTimeout(() => msg.delete(), 5000);
-                        });
+                        bf.sendMessage(channel, `I tried to pin a message, but I lack permissions. Please give me a role which has permission to manage messages.`);
                         break;
                     default:
                         throw err;
