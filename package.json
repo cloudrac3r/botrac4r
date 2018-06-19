@@ -1,0 +1,30 @@
+{
+  "name": "botrac4r",
+  "version": "1.0.0",
+  "description": "",
+  "main": "botrac4r.js",
+  "dependencies": {
+    "canvas": "github:Automattic/node-canvas",
+    "discord.io-gateway_v6": "^2.5.3",
+    "eris": "^0.8.6",
+    "garfield": "^1.1.2",
+    "pretty-ms": "^3.2.0",
+    "rss-parser": "^3.1.4",
+    "sqlite3": "^4.0.0",
+    "uws": "^10.148.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudrac3r/botrac4r.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cloudrac3r/botrac4r/issues"
+  },
+  "homepage": "https://github.com/cloudrac3r/botrac4r#readme"
+}
