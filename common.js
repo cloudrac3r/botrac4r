@@ -141,6 +141,18 @@ module.exports = {
         }
         return word;
     },
+    // Capitalise the first letter of a sentence
+    capitalise: function(string, lowerOthers, everyWord) {
+        if (everyWord) {
+            string = string.split(" ").map(s => module.exports.capitalise(s, lowerOthers)).join(" ");
+        } else {
+            if (lowerOthers) {
+                string = string.toLowerCase();
+            }
+            string = string.charAt(0).toUpperCase()+string.slice(1);
+        }
+        return string;
+    },
     // Get a XX:XX:XX formatted string from a Date object (UTC time).
     getReadableTime: function(date, detail, ampm) {
         let result;
