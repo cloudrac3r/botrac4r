@@ -326,7 +326,7 @@ module.exports = function(input) {
             longHelp: "Specify a colour as a hex value to display it. Alternatively, don't specify a colour to get a random one.",
             eris: true,
             code: function(msg, command) {
-                let canvas = new Canvas(200, 200);
+                let canvas = Canvas.createCanvas(200, 200);
                 let ctx = canvas.getContext("2d");
                 let colour;
                 if (command.regularWords[0].match(/^#?([A-Fa-f0-9]{3}){1,2}$/)) {
@@ -337,7 +337,7 @@ module.exports = function(input) {
                 }
                 if (colour.includes("dab")) {
                     if (Math.random() < 0.95) {
-                        colour = colour.replace(/dab/g, "bad"); 
+                        colour = colour.replace(/dab/g, "bad");
                     } else {
                         bf.sendMessage(msg.channel, "omg dab", {embed: {image: {url: "https://cdn.discordapp.com/attachments/160197704226439168/441052899041345557/emoji.png"}}});
                     }
