@@ -35,7 +35,7 @@ module.exports = function(input) {
 
     reloadEvent.on(__filename, () => {
         timers.forEach(t => clearTimeout(t));
-    }); 
+    });
     bf.onBotConnect(() => {
         db.all("SELECT * FROM Reminders", (err, dbr) => {
             dbr.forEach(reminder => {

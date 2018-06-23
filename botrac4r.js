@@ -135,7 +135,10 @@ bot.once("ready", function() { // Once the bot connects
 });
 
 bot.on("messageCreate", checkMessage);
-bot.on("messageUpdate", checkMessage);
+bot.on("messageUpdate", (newm, oldm) => {
+    if (oldm == null || newm.content == undefined) return;
+    if (newm.editedTimestamp && oldm.editedTimestamp != newm.editedTimestamp) checkMessage(newm);
+});
 function checkMessage(msg) {
     if (!msg.content) return;
     let message = msg.content;
