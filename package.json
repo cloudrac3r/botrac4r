@@ -5,7 +5,7 @@
   "main": "botrac4r.js",
   "dependencies": {
     "canvas": "github:Automattic/node-canvas",
-    "discord.io-gateway_v6": "^2.5.3",
+    "deep-extend": "^0.6.0",
     "eris": "^0.8.6",
     "garfield": "^1.1.2",
     "pretty-ms": "^3.2.0",
