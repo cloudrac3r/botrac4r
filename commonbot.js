@@ -667,12 +667,17 @@ module.exports = function(input) {
 
     // Get user emojis
     bf.onBotConnect(() => {
-        bf.getMessage(userEmojiMessage.channelID, userEmojiMessage.messageID).then(msg => {
+        bf.getMessage(userEmojiMessage.channelID, userEmojiMessage.messageID).then(updateEmojis);
+        bf.addTemporaryListener(bot, "messageUpdate", __filename, msg => {
+            if (!msg.content) return;
+            if (userEmojiMessage.messageID == msg.id) updateEmojis(msg);
+        });
+        (function updateEmojis(msg) {
             msg.content.split("\n").forEach(line => {
                 let [userID, emoji] = line.split(" ");
                 bf.userEmojis[userID] = emoji;
             });
-        });
+        })();
     });
 
     return bf;
