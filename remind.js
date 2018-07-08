@@ -1,40 +1,52 @@
 const prettyMs = require("pretty-ms");
 const timeMultipliers = {
     s: 1000,
-    m: 60*1000,
-    h: 60*60*1000,
-    d: 24*60*60*1000,
-    w: 7*24*60*60*1000
+    m: 1000*60,
+    h: 1000*60*60,
+    d: 1000*60*60*24,
+    w: 1000*60*60*24*7,
+    y: 1000*60*60*24*365
 };
 let timers = [];
+let longTimers = [];
 
 module.exports = function(input) {
     let {bot, cf, bf, db, reloadEvent} = input;
 
+    let longTimerInterval = setInterval(function() {
+        longTimers.forEach(addReminder);
+        longTimers.length = 0;
+    }, timeMultipliers.w);
+
     function addReminder(reminder) {
-        timers.push(setTimeout(() => {
-            let text = `<@${reminder.userID}> Ping! ${reminder.textTime} ago, `;
-            if (reminder.text) text += `you asked me to remind you about this:\n${reminder.text}`;
-            else text += `you set a reminder. Press ${bf.buttons["up"]} to temporarily pin the original message so you can jump back there.`;
-            bf.reactionMenu(reminder.channelID, text, [
-                {emoji: bf.buttons["up"], remove: "user", actionType: "js", actionData: (msg, reactionMenus) => {
-                    let messageObject = {channelID: reminder.channelID, messageID: reminder.messageID};
-                    reloadEvent.emit("pinarchive ignore", messageObject);
-                    bf.pinMessage(reminder.channelID, reminder.messageID).then(pinAlert => {
-                        cf.log(`Pinned reminder message (${reminder.messageID}) for jumping`, "spam");
-                        setTimeout(() => {
-                            bf.unpinMessage(reminder.channelID, reminder.messageID);
-                            pinAlert.delete();
-                        }, 30*1000);
-                    });
-                }}
-            ]);
-            db.run("DELETE FROM Reminders WHERE id=?", reminder.id);
-        }, reminder.time-Date.now()));
+        if (reminder.time-Date.now() > timeMultipliers.w) {
+            setImmediate(() => longTimers.push(reminder));
+        } else {
+            timers.push(setTimeout(() => {
+                let text = `<@${reminder.userID}> Ping! ${reminder.textTime} ago, `;
+                if (reminder.text) text += `you asked me to remind you about this:\n${reminder.text}`;
+                else text += `you set a reminder. Press ${bf.buttons["up"]} to temporarily pin the original message so you can jump back there.`;
+                bf.reactionMenu(reminder.channelID, text, [
+                    {emoji: bf.buttons["up"], remove: "user", actionType: "js", allowedUsers: [reminder.userID], actionData: (msg, reactionMenus) => {
+                        let messageObject = {channelID: reminder.channelID, messageID: reminder.messageID};
+                        reloadEvent.emit("pinarchive ignore", messageObject);
+                        bf.pinMessage(reminder.channelID, reminder.messageID).then(pinAlert => {
+                            cf.log(`Pinned reminder message (${reminder.messageID}) for jumping`, "spam");
+                            setTimeout(() => {
+                                bf.unpinMessage(reminder.channelID, reminder.messageID);
+                                pinAlert.delete();
+                            }, 30*1000);
+                        });
+                    }}
+                ]);
+                db.run("DELETE FROM Reminders WHERE id=?", reminder.id);
+            }, reminder.time-Date.now()));
+        }
     }
 
     reloadEvent.on(__filename, () => {
         timers.forEach(t => clearTimeout(t));
+        clearInterval(longTimerInterval);
     });
     bf.onBotConnect(() => {
         db.all("SELECT * FROM Reminders", (err, dbr) => {
@@ -58,10 +70,10 @@ module.exports = function(input) {
                 let textTime = [];
                 let valid = false;
                 let w = words[0];
-                while (w && w.match(/^\d+[wdhms]$/)) {
+                while (w && w.match(/^\d+[ywdhms]$/)) {
                     valid = true;
                     textTime.push(w);
-                    let [number,letter] = w.match(/^(\d+)([wdhms])$/).slice(1);
+                    let [number,letter] = w.match(/^(\d+)([ywdhms])$/).slice(1);
                     time += number*timeMultipliers[letter];
                     words.shift();
                     w = words[0];
