@@ -56,6 +56,9 @@ let modules = [ // Load these modules on startup and on change
     },{
         filename: __dirname+"/imageconvert.js",
         dest: "bot commands"
+    },{
+        filename: __dirname+"/waitfor.js",
+        dest: "bot commands"
     }/*,{
         filename: __dirname+"/pets/pet.js",
         dest: "bot commands"
