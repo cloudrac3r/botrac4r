@@ -672,12 +672,12 @@ module.exports = function(input) {
             if (!msg.content) return;
             if (userEmojiMessage.messageID == msg.id) updateEmojis(msg);
         });
-        (function updateEmojis(msg) {
+        function updateEmojis(msg) {
             msg.content.split("\n").forEach(line => {
                 let [userID, emoji] = line.split(" ");
                 bf.userEmojis[userID] = emoji;
             });
-        })();
+        }
     });
 
     return bf;

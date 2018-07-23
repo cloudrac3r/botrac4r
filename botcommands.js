@@ -43,7 +43,7 @@ module.exports = function(input) {
         choose: {
             aliases: ["choose", "choice", "pick"],
             shortHelp: "Choose an item from a list",
-            reference: "[+t *title*] *item1* [*item2*] [*item3*] [*...*]",
+            reference: "[+t *title*;] *item1*; [*item2*;] [*item3*;] [*...*]",
             longHelp: "Put a series of words seperated by AS to choose exactly one of them.",
             eris: true,
             code: function(msg, command) {
@@ -116,7 +116,7 @@ module.exports = function(input) {
                                                `${bf.buttons["2"]} Prefix plus space (currently **${(dbr.prefix.endsWith(" ") ? "using a space" : "not using a space")}**)\n`+
                                                `${bf.buttons["3"]} Regex prefix (currently a **${(dbr.isRegex ? "regex" : "string")}**)\n`+
                                                `${bf.buttons["4"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`+
-                                               `${bf.buttons["5"]} HookTube links (currently **${(dbr.hooktube ? "on" : "off")}**)`, [
+                                               `${bf.buttons["5"]} CloudTube links (currently **${(dbr.hooktube ? "on" : "off")}**)`, [
                         {emoji: bf.buttons["1"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             bf.messageMenu(msg.channel, "What would you like your new prefix to be?", userID, undefined, msg => {
                                 new Promise((resolve, reject) => {
@@ -209,7 +209,7 @@ module.exports = function(input) {
                                     else bf.addReaction(msg, "❎");
                                 });
                             }
-                            bf.reactionMenu(msg.channel, "Would you like to be able to get a HookTube link  to the same video every time you post a YouTube link?", [
+                            bf.reactionMenu(msg.channel, "Would you like to be able to get a CloudTube link  to the same video every time you post a YouTube link?", [
                                 {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: msg => setHooktubePref(msg, 1)},
                                 {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: msg => setHooktubePref(msg, 0)}
                             ]);
