@@ -91,7 +91,7 @@ function log(data, type) {
 const destinations = {
     "common": filename => Object.assign(cf, require(filename)),
     "bot framework": filename => Object.assign(bf, require(filename)({Discord, bot, cf, db, reloadEvent, loadModule})),
-    "bot commands": filename => Object.assign(bc, require(filename)({Discord, bot, cf, bf, db, reloadEvent, loadModule}))
+    "bot commands": filename => Object.assign(bc, require(filename)({Discord, bot, cf, bf, bc, db, reloadEvent, loadModule}))
 }
 
 let stdin = process.stdin; // Use the terminal to run JS code
@@ -155,65 +155,32 @@ function checkMessage(msg) {
         if (!dbr) {
             //bf.sendMessage(channelID, "<@"+userID+"> I don't have information stored for you, so you'll be set up to use "+bot.username+" with the default settings. There will be a command at some point to change them.");
             dbr = {prefix: defaultPrefix, isRegex: 0, seperator: defaultSeperator, altSeperator: defaultAltSplit};
-            db.run("INSERT INTO Users VALUES (?, ?, 0, ?, ?, ?, 0)", [msg.author.id, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
+            db.run("INSERT INTO Users VALUES (?, ?, 0, ?, ?, ?, 0, 0)", [msg.author.id, defaultPrefix, defaultSeperator, defaultAltSplit, defaultMentionPref]);
         }
-        let { prefix, seperator, altSeperator, isRegex } = dbr;
+        let { prefix, seperator, altSeperator, isRegex, defaultPrefix: defaultPrefixAlwaysEnabled } = dbr;
         //log(event, "info");
-        let mp;
-        let noncommand;
-        if (isRegex) {
-            if (message.match(prefix)) mp = message.split(message.match(prefix)[0]).join("").split(seperator);
-        } else {
-            if (message.startsWith(prefix)) {
-                let match = message.slice(prefix.length).match(new RegExp(`^(.*?)(?:${seperator}|\n)(.*)$`, "ms"));
-                if (match) {
-                    mp = [match[1]].concat(match[2].split(seperator));
-                    noncommand = match[2];
-                } else {
-                    mp = [message.slice(prefix.length)];
-                    noncommand = "";
-                }
-            }
+
+        let command;
+        let defaultPrefixUsed = false;
+        if (isRegex && message.match(prefix)) { // Regex
+            let match = message.match(prefix);
+            command = message.slice(0, match.index) + message.slice(match.index+match[0].length);
+        } else if (!isRegex && message.startsWith(prefix)) { // User prefix
+            command = message.slice(prefix.length);
+        } else if (message.startsWith(defaultPrefix)) { // Default prefix
+            prefix = defaultPrefix;
+            isRegex = false;
+            defaultPrefixUsed = true;
+            command = message.slice(defaultPrefix.length);
+        } else { // Not a command
+            return;
         }
-        if (mp && mp[0]) {
-            if (mp[0].includes("\n")) {
-                let word = mp.shift();
-                mp.unshift(...word.split("\n"));
-            }
-            Object.values(bc).forEach(command => { // Find a bot command whose alias matches
-                if (command.aliases.includes(mp[0])) {
-                    if (command.eris) {
-                        command.code(msg, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]));
-                    } else {
-                        command.code(msg.author.id, msg.channel, cf.carg(mp.slice(1).join(seperator), prefix, seperator, defaultAltSplit, mp[0]), {d: msg});
-                    }
-                }
-            });
-            if (mp[0] == "help") { // Exclusive help command because reasons
-                let target;
-                if (mp[1]) target = Object.keys(bc).map(c => bc[c]).filter(c => c.aliases.includes(mp[1]))[0];
-                if (target) {
-                    bf.sendMessage(msg.channel, `**${target.shortHelp}**\n`+
-                                                `**Aliases**: ${target.aliases.join(", ")}\n`+
-                                                `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
-                                                (target.longHelp ? "\n\n"+target.longHelp : ""));
-                } else {
-                    let commands = Object.values(bc).filter(c => !c.hidden);
-                    if (!bf.isDMChannel(msg.channel)) bf.sendMessage(msg.channel, "DM sent.");
-                    bf.sendMessage(msg.author.id,
-                        "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
-                            commands.map(c => prefix+c.aliases[0]),
-                            commands.map(c => c.shortHelp)
-                        ], ["left", "left"])+"```"
-                    ).then(() => bf.sendMessage(msg.author.id,
-                        "For some commands, "+bot.user.username+" allows you to use things called **flags** and **switches**.\n"+
-                        "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a specific option.\n"+
-                        "Switches are used by connecting two words with an equals sign, e.g. `size=4`. This allows you to specify a certain value for an option.\n"+
-                        "The whole point of flags and switches is that they can be used **anywhere in the command** rather than needing to be in a specific order. "+
-                        "This is very helpful if you often forget the correct order for words in a certain command.\n"+
-                        "If you don't want to use flags or switches, you can usually use positional arguments instead."
-                    ));
-                }
+        let match = command.match(new RegExp(`^(.*?)(?:${seperator}|\n)(.*)$`, "ms"));
+        if (match) command = match[1] + seperator + match[2];
+        let words = command.split(seperator);
+        for (let command of Object.values(bc)) { // Find a bot command whose alias matches
+            if (command.aliases.includes(words[0]) && (!defaultPrefixUsed || command.defaultPrefixAllowed || defaultPrefixAlwaysEnabled)) {
+                command.code(msg, cf.carg(words.slice(1).join(seperator), prefix, seperator, defaultAltSplit, words[0]));
             }
         }
     });

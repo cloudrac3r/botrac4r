@@ -249,5 +249,28 @@ module.exports = {
             args.push(v);
         });
         return args;
+    },
+    // Split a message into chunks to avoid character limit restrictions.
+    splitMessage: function(content, maxLength) {
+        let fragments = [];
+        let lines = content.split("\n");
+        while (lines.length) {
+            let ok = true;
+            let output = "";
+            while (ok) {
+                let next = lines[0];
+                let nextOutput = output + (output && "\n") + next;
+                if (nextOutput.length > maxLength) {
+                    if (!output.length) return ["Error: Line too long to be broken"];
+                    ok = false;
+                } else {
+                    output = nextOutput;
+                    lines.shift();
+                }
+                if (!lines.length) ok = false;
+            }
+            fragments.push(output);
+        }
+        return fragments;
     }
 }

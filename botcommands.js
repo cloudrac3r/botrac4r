@@ -1,7 +1,7 @@
 let Canvas = require("canvas");
 
 module.exports = function(input) {
-    let {bot, cf, bf, db} = input;
+    let {bot, cf, bf, bc, db} = input;
     const prettyMs = require("pretty-ms");
     let availableFunctions = {
         /*menu: {
@@ -14,6 +14,41 @@ module.exports = function(input) {
                 ]);
             }
         },*/
+        help: {
+            aliases: ["help"],
+            shortHelp: "Looks like you got it figured out already",
+            reference: "[*command*]",
+            longHelp: "Looks like you got this part figured out as well. Nice.",
+            eris: true,
+            defaultPrefixAllowed: true,
+            code: function(msg, command) {
+                let prefix = command.prefix;
+                let target;
+                if (command.regularWords[0]) target = Object.keys(bc).map(c => bc[c]).find(c => c.aliases.includes(command.regularWords[1]));
+                if (target) {
+                    bf.sendMessage(msg.channel, `**${target.shortHelp}**\n`+
+                                                `**Aliases**: ${target.aliases.join(", ")}\n`+
+                                                `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
+                                                (target.longHelp ? "\n\n"+target.longHelp : ""));
+                } else {
+                    let commands = Object.values(bc).filter(c => !c.hidden);
+                    if (!bf.isDMChannel(msg.channel)) bf.sendMessage(msg.channel, "DM sent.");
+                    bf.sendMessage(msg.author.id,
+                        "Here's the complete command list. Try **"+prefix+"help *command name*** for more details about a specific command.```\n"+cf.tableify([
+                            commands.map(c => prefix+c.aliases[0]),
+                            commands.map(c => c.shortHelp)
+                        ], ["left", "left"])+"```"
+                    ).then(() => bf.sendMessage(msg.author.id,
+                        "For some commands, "+bot.user.username+" allows you to use things called **flags** and **switches**.\n"+
+                        "Flags are used by prefixing a word with either a + or a -, e.g. `+timer`. This allows you to enable or disable a specific option.\n"+
+                        "Switches are used by connecting two words with an equals sign, e.g. `size=4`. This allows you to specify a certain value for an option.\n"+
+                        "The whole point of flags and switches is that they can be used **anywhere in the command** rather than needing to be in a specific order. "+
+                        "This is very helpful if you often forget the correct order for words in a certain command.\n"+
+                        "If you don't want to use flags or switches, you can usually use positional arguments instead.\n\nYour current prefix is `"+prefix+"`"
+                    ));
+                }
+            }
+        },
         roll: {
             aliases: ["roll", "dice", "random", "rng"],
             shortHelp: "Pick a random number",
@@ -61,7 +96,7 @@ module.exports = function(input) {
         temp: {
             aliases: ["temp", "temperature", "celsius", "farenheit"],
             shortHelp: "Convert a temperature between Celsius and Farenheit",
-            reference: "*temperature*",
+            reference: "*temperature* [*description*]",
             longHelp: "Put exactly one number without a unit and it will be converted in both directions.",
             eris: true,
             code: function(msg, command) {
@@ -108,6 +143,7 @@ module.exports = function(input) {
             reference: "",
             longHelp: "A menu will appear allowing you to change settings.",
             eris: true,
+            defaultPrefixAllowed: true,
             code: function(msg, command) {
                 let userID = msg.author.id;
                 db.get("SELECT * FROM Users WHERE userID=?", userID, (err,dbr) => {
@@ -115,8 +151,9 @@ module.exports = function(input) {
                                                `${bf.buttons["1"]} Prefix (currently \`${dbr.prefix.replace(/`/g, "ˋ")}\`)\n`+ //SC: IPA modifier grave U+02CB
                                                `${bf.buttons["2"]} Prefix plus space (currently **${(dbr.prefix.endsWith(" ") ? "using a space" : "not using a space")}**)\n`+
                                                `${bf.buttons["3"]} Regex prefix (currently a **${(dbr.isRegex ? "regex" : "string")}**)\n`+
-                                               `${bf.buttons["4"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`+
-                                               `${bf.buttons["5"]} CloudTube links (currently **${(dbr.hooktube ? "on" : "off")}**)`, [
+                                               `${bf.buttons["4"]} Default prefix (currently **${(dbr.defaultPrefix ? "always enabled" : "enabled for certain commands only")}**)\n`+
+                                               `${bf.buttons["5"]} Mentions (currently **${(dbr.mention ? "on" : "off")}**)\n`+
+                                               `${bf.buttons["6"]} CloudTube links (currently **${(dbr.hooktube ? "on" : "off")}**)`, [
                         {emoji: bf.buttons["1"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             bf.messageMenu(msg.channel, "What would you like your new prefix to be?", userID, undefined, msg => {
                                 new Promise((resolve, reject) => {
@@ -144,7 +181,7 @@ module.exports = function(input) {
                         }},
                         {emoji: bf.buttons["2"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: () => {
                             if (!dbr.prefix.endsWith(" ")) {
-                                bf.sendMessage(msg.channel, "A space will be appended to your current prefix.", (err, id) => {
+                                bf.sendMessage(msg.channel, "A space will be appended to your current prefix.").then(msg => {
                                     db.run("UPDATE Users SET prefix=? WHERE userID=?", [dbr.prefix+" ", userID], (err) => {
                                         if (!err) {
                                             bf.addReaction(msg, "✅");
@@ -155,7 +192,7 @@ module.exports = function(input) {
                                     });
                                 });
                             } else {
-                                bf.sendMessage(msg.channel, "Ending spaces will be removed from your current prefix.", (err, id) => {
+                                bf.sendMessage(msg.channel, "Ending spaces will be removed from your current prefix.").then(msg => {
                                     db.run("UPDATE Users SET prefix=? WHERE userID=?", [dbr.prefix.replace(/ *$/, ""), userID], (err) => {
                                         if (!err) {
                                             bf.addReaction(msg, "✅");
@@ -168,14 +205,14 @@ module.exports = function(input) {
                             }
                         }},
                         {emoji: bf.buttons["3"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
-                            let id;
+                            let nmsg;
                             function setRegexPref(value) {
                                 db.run("UPDATE Users SET isRegex=? WHERE userID=?", [value, userID], (err) => {
                                     if (!err) {
-                                        bf.addReaction(msg, "✅");
+                                        bf.addReaction(nmsg, "✅");
                                         dbr.isRegex = value;
                                     } else {
-                                        bf.addReaction(msg, "❎");
+                                        bf.addReaction(nmsg, "❎");
                                     }
                                 });
                             }
@@ -184,35 +221,55 @@ module.exports = function(input) {
                                 bf.reactionMenu(msg.channel, "Would you like your prefix to be a regular expression instead of a string?", [
                                     {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setRegexPref(1)},
                                     {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setRegexPref(0)}
-                                ], (err,mid) => id = mid);
+                                ]).then(n => nmsg = n);
                             } catch (e) {
                                 bf.sendMessage(msg.channel, "Your current prefix is not a valid regular expression and so this option cannot be set.");
                             }
                         }},
                         {emoji: bf.buttons["4"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
-                            let id;
-                            function setMentionPref(pref) {
-                                db.run("UPDATE Users SET mention=? WHERE userID=?", [pref, userID], function(err, dbr) {
+                            bf.reactionMenu(msg.channel,
+                                "In addition to your custom prefix, you may choose to also enable botrac4r's default prefix (in case you forget, for example).\n"+
+                                "If you choose *yes,* you may use either your custom prefix or the default prefix for every command.\n"+
+                                "If you choose *no,* you will only be able to use the default prefix for certain important commands such as help and configure, "+
+                                "and must use your custom prefix for all other commands.",
+                                [
+                                    {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: setPref},
+                                    {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: setPref}
+                                ]
+                            );
+                            function setPref(msg, emoji) {
+                                let value = bf.fixEmoji(emoji).includes("yes");
+                                db.run("UPDATE Users SET defaultPrefix = ? WHERE userID = ?", [value, userID], err => {
                                     if (!err) bf.addReaction(msg, "✅");
                                     else bf.addReaction(msg, "❎");
+                                });
+                            }
+                        }},
+                        {emoji: bf.buttons["5"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                            let nmsg;
+                            function setMentionPref(pref) {
+                                db.run("UPDATE Users SET mention=? WHERE userID=?", [pref, userID], function(err, dbr) {
+                                    if (!err) bf.addReaction(nmsg, "✅");
+                                    else bf.addReaction(nmsg, "❎");
                                 });
                             }
                             bf.reactionMenu(msg.channel, "Would you like to be mentioned at the start of command responses?", [
                                 {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(1)},
                                 {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: () => setMentionPref(0)}
-                            ], (err,mid) => id = mid);
+                            ]).then(n => nmsg = n);
                         }},
-                        {emoji: bf.buttons["5"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                        {emoji: bf.buttons["6"], allowedUsers: [userID], remove: "user", actionType: "js", actionData: function() {
+                            let nmsg;
                             function setHooktubePref(msg, pref) {
                                 db.run("UPDATE Users SET hooktube=? WHERE userID=?", [pref, userID], function(err, dbr) {
-                                    if (!err) bf.addReaction(msg, "✅");
-                                    else bf.addReaction(msg, "❎");
+                                    if (!err) bf.addReaction(nmsg, "✅");
+                                    else bf.addReaction(nmsg, "❎");
                                 });
                             }
                             bf.reactionMenu(msg.channel, "Would you like to be able to get a CloudTube link  to the same video every time you post a YouTube link?", [
                                 {emoji: bf.buttons["yes"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: msg => setHooktubePref(msg, 1)},
                                 {emoji: bf.buttons["no"], allowedUsers: [userID], ignore: "total", actionType: "js", actionData: msg => setHooktubePref(msg, 0)}
-                            ]);
+                            ]).then(n => nmsg = n);
                         }}
                     ]);
                 });

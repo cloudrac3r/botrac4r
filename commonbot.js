@@ -289,21 +289,25 @@ module.exports = function(input) {
             })
             .then(() => bf.resolveChannel(channel))
             .then(channel => {
-                return channel.createMessage(actualContent, file)
-                .then(messageObject => {
+                let messages = cf.splitMessage(actualContent.content, 2000);
+                let all;
+                if (messages.length == 1) {
+                    all = Promise.all([channel.createMessage(actualContent, file)]);
+                } else {
+                    all = Promise.all(
+                        messages.slice(0, -1).map(fragment => channel.createMessage(fragment))
+                        .concat(channel.createMessage(Object.assign(actualContent, {content: messages.slice(-1)[0]})))
+                    );
+                }
+                return all.then(results => {
+                    let messageObject = results.slice(-1)[0];
                     cf.log(`Sent a message (${messageObject.id}) to ${bf.nameOfChannel(channel)} (${channel.id}):\n${messageObject.content}`, "spam");
                     bot.getChannel(channel.id).messages.add(messageObject, undefined, true);
                     if (additional.legacy) callback(null, messageObject.id, messageObject);
                     else callback(null, messageObject);
                     return messageObject;
                 })
-                .catch(err => {
-                    callback(err);
-                    switch (err.code) {
-                    default:
-                        throw err;
-                    }
-                });
+                .catch(callback);
             });
         },
         // Edit a message sent by the bot.
