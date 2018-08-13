@@ -252,6 +252,7 @@ module.exports = {
     },
     // Split a message into chunks to avoid character limit restrictions.
     splitMessage: function(content, maxLength) {
+        if (!content) return [];
         let fragments = [];
         let lines = content.split("\n");
         while (lines.length) {
