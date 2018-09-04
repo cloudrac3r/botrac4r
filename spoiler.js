@@ -19,7 +19,7 @@ module.exports = function(input) {
             code: function(msg, command) {
                 setTimeout(() => msg.delete(), 250);
                 let hidden = command.input.replace(/\w/ig, "🅱");
-                bf.reactionMenu(msg.channel, msg.author.mention+" just posted a spoiler:\n\n"+hidden+"\n\nPress "+bf.buttons.info+" to reveal, or <:hippospecial:421589347943448589> to partially reveal.", [
+                let menu = [
                     {emoji: bf.buttons.info},
                     {emoji: "<:hippospecial:421589347943448589>", actionType: "js", actionData: (msg, emoji, user) => {
                         attempts = 0;
@@ -40,7 +40,9 @@ module.exports = function(input) {
                             }
                         })();
                     }}
-                ]).then(msg => {
+                ];
+                if (msg.author.id == "112760500130975744") menu.splice(1, 1);
+                bf.reactionMenu(msg.channel, msg.author.mention+" just posted a spoiler:\n\n"+hidden+"\n\nPress "+bf.buttons.info+" to reveal, or <:hippospecial:421589347943448589> to partially reveal.", menu).then(msg => {
                     db.run("INSERT INTO Spoilers VALUES (?, ?, ?)", [msg.channel.id, msg.id, command.input]);
                 });
             }
