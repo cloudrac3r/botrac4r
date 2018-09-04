@@ -24,11 +24,11 @@ module.exports = function(input) {
             code: function(msg, command) {
                 let prefix = command.prefix;
                 let target;
-                if (command.regularWords[0]) target = Object.keys(bc).map(c => bc[c]).find(c => c.aliases.includes(command.regularWords[1]));
+                if (command.regularWords[0]) target = Object.keys(bc).map(c => bc[c]).find(c => c.aliases.includes(command.regularWords[0]));
                 if (target) {
                     bf.sendMessage(msg.channel, `**${target.shortHelp}**\n`+
                                                 `**Aliases**: ${target.aliases.join(", ")}\n`+
-                                                `**Usage**: ${prefix}${mp[1]} ${target.reference}`+
+                                                `**Usage**: ${command.prefix}${command.regularWords[0]} ${target.reference}`+
                                                 (target.longHelp ? "\n\n"+target.longHelp : ""));
                 } else {
                     let commands = Object.values(bc).filter(c => !c.hidden);
@@ -64,8 +64,8 @@ module.exports = function(input) {
                 else min = 1;
                 let max;
                 if (command.switches.max) max = parseInt(command.switches.max);
-                else if (command.numbers.length == 1) max = parseInt(command.numbers[0]);
                 else if (command.numbers.length >= 2) max = parseInt(command.numbers[1]);
+                else if (command.numbers.length == 1) max = parseInt(command.numbers[0]);
                 else max = 100;
                 if (min > max) { // Swap order if min was actually the larger number
                     let t = min; min = max; max = t;
@@ -79,7 +79,7 @@ module.exports = function(input) {
             aliases: ["choose", "choice", "pick"],
             shortHelp: "Choose an item from a list",
             reference: "[+t *title*;] *item1*; [*item2*;] [*item3*;] [*...*]",
-            longHelp: "Put a series of words seperated by AS to choose exactly one of them.",
+            longHelp: "Put a series of words seperated by `;` to choose exactly one of them.",
             eris: true,
             code: function(msg, command) {
                 if (command.altWords[0] == "") {
